@@ -2,6 +2,7 @@
 
 let mapInstance, markersLayer;
 let currentIdx = 0;
+let DISPLAY_TOKENS = [];
 const pinsByTokenId  = {};
 const activeCarousel = {};
 
@@ -11,7 +12,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   grid.innerHTML = `<p class="loading-msg" style="grid-column:1/-1">Loading from the blockchain…</p>`;
 
   if (window.L) {
-    mapInstance = L.map("map", { scrollWheelZoom: false }).setView([36, -100], 4);
+    mapInstance = L.map("map", {
+      scrollWheelZoom: false,
+      tap: true,
+      touchZoom: true,
+      zoomControl: false,
+    }).setView([36, -100], 4);
+    L.control.zoom({ position: "bottomright" }).addTo(mapInstance);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© <a href='https://openstreetmap.org'>OpenStreetMap</a>", maxZoom: 18,
     }).addTo(mapInstance);
@@ -26,34 +33,66 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  if (counter) counter.textContent = TOKENS.length;
-  grid.innerHTML = "";
-  TOKENS.forEach((t, i) => addCard(t, i));
+  await fetchAvailability();
+  DISPLAY_TOKENS = uniqueArtworkTokens(TOKENS);
 
-  // Fetch availability in background after cards exist, then update badges.
-  fetchAvailability().then(() => {
-    document.querySelectorAll(".sketch-card").forEach(card => {
-      const tid   = String(card.dataset.tokenId);
-      const token = TOKENS.find(t => String(t.tokenId) === tid);
-      if (token) updateCardAvailability(card, token);
-    });
-  });
+  if (counter) counter.textContent = DISPLAY_TOKENS.length;
+  grid.innerHTML = "";
+  DISPLAY_TOKENS.forEach((t, i) => addCard(t, i));
 
   // setupLightbox BEFORE applyCoords so openLightbox is defined when pins are clicked
   setupLightbox();
-  await applyCoords(token => addPin(token));
+  await applyCoords(token => {
+    if (DISPLAY_TOKENS.some(t => String(t.tokenId) === String(token.tokenId))) addPin(token);
+  });
   fitMapToPins();
   renderCollectors();
 
   startLiveUpdates(newToken => {
-    const i = TOKENS.length - 1;
-    addCard(newToken, i);
+    DISPLAY_TOKENS = uniqueArtworkTokens(TOKENS);
+    const i = DISPLAY_TOKENS.findIndex(t => String(t.tokenId) === String(newToken.tokenId));
+    if (i >= 0) addCard(DISPLAY_TOKENS[i], i);
     if (newToken.lat && newToken.lng) addPin(newToken);
-    if (counter) counter.textContent = TOKENS.length;
+    if (counter) counter.textContent = DISPLAY_TOKENS.length;
     showToast(`New sketch: "${newToken.name}"`);
     renderCollectors();
   });
 });
+
+function uniqueArtworkTokens(tokens) {
+  const groups = new Map();
+  for (const token of tokens) {
+    const key = token.img || `token-${token.tokenId}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(token);
+  }
+
+  return [...groups.values()].map(group => {
+    if (group.length === 1) return group[0];
+
+    const sorted = [...group].sort((a, b) => artworkRank(b) - artworkRank(a));
+    const chosen = { ...sorted[0] };
+    const seen = new Set();
+    chosen.collectors = group
+      .flatMap(t => t.collectors || [])
+      .filter(c => {
+        if (!c.address || seen.has(c.address)) return false;
+        seen.add(c.address);
+        return true;
+      });
+    chosen.relatedTokens = group.map(t => t.tokenId);
+    return chosen;
+  });
+}
+
+function artworkRank(token) {
+  let score = 0;
+  if (token.availabilityKind !== "burned") score += 100;
+  if (token.supply > 1) score += 40;
+  if (token.availabilityKind === "open" || token.availabilityKind === "auction") score += 20;
+  if ((token.collectors || []).length) score += 10;
+  return score;
+}
 
 // ── Availability ──────────────────────────────────────────────────────────────
 function availabilityBadge(token) {
@@ -175,7 +214,7 @@ const PIN_SVG = `<svg width="18" height="26" viewBox="0 0 18 26" xmlns="http://w
 function addPin(token) {
   if (!window.L || !markersLayer || !token.lat || !token.lng) return;
 
-  const grouped = TOKENS.filter(t =>
+  const grouped = DISPLAY_TOKENS.filter(t =>
     t.lat && t.lng &&
     t.lat.toFixed(4) === token.lat.toFixed(4) &&
     t.lng.toFixed(4) === token.lng.toFixed(4)
@@ -183,7 +222,7 @@ function addPin(token) {
 
   // Reuse existing pin at same location
   const existingTid = Object.keys(pinsByTokenId).find(tid => {
-    const t = TOKENS.find(x => x.tokenId === parseInt(tid));
+    const t = DISPLAY_TOKENS.find(x => String(x.tokenId) === String(tid));
     return t?.lat?.toFixed(4) === token.lat.toFixed(4) && t?.lng?.toFixed(4) === token.lng.toFixed(4);
   });
   if (existingTid) { pinsByTokenId[token.tokenId] = pinsByTokenId[existingTid]; return; }
@@ -193,16 +232,24 @@ function addPin(token) {
   });
 
   marker.on("mouseover", () => showCarousel(marker, grouped));
-  marker.on("mouseout",  () => scheduleCarouselClose(`${token.lat.toFixed(4)},${token.lng.toFixed(4)}`));
+  marker.on("click", () => showCarousel(marker, grouped));
+  marker.on("mouseout",  () => {
+    if (isCoarsePointer()) return;
+    scheduleCarouselClose(`${token.lat.toFixed(4)},${token.lng.toFixed(4)}`);
+  });
 
   markersLayer.addLayer(marker);
   pinsByTokenId[token.tokenId] = marker;
 }
 
+function isCoarsePointer() {
+  return window.matchMedia?.("(pointer: coarse)")?.matches || window.innerWidth <= 600;
+}
+
 function fitMapToPins() {
   if (!mapInstance || !markersLayer || markersLayer.getLayers().length === 0) return;
   const bounds = L.latLngBounds(markersLayer.getLayers().map(marker => marker.getLatLng()));
-  mapInstance.fitBounds(bounds.pad(0.2), { maxZoom: 5 });
+  mapInstance.fitBounds(bounds.pad(isCoarsePointer() ? 0.08 : 0.2), { maxZoom: isCoarsePointer() ? 6 : 5 });
 }
 
 // ── Carousel ──────────────────────────────────────────────────────────────────
@@ -222,7 +269,7 @@ function carouselHTML(key, tokens, idx) {
   const photos = placePhotosUrl(t)
     ? `<a class="c-open c-street" href="${placePhotosUrl(t)}" target="_blank" rel="noopener">Place photos</a>`
     : "";
-  const tokenIdx = TOKENS.indexOf(t);
+  const tokenIdx = DISPLAY_TOKENS.findIndex(token => String(token.tokenId) === String(t.tokenId));
   return `<div class="carousel-popup" data-key="${key}">
     <div class="c-img-wrap">
       <img class="c-img" src="${t.img}" alt="${t.name}">
@@ -251,7 +298,11 @@ function showCarousel(marker, tokens) {
 
   marker.unbindPopup();
   marker.bindPopup(carouselHTML(key, tokens, idx), {
-    maxWidth: 220, minWidth: 200, className: "carousel-leaflet-popup", closeButton: false,
+    maxWidth: isCoarsePointer() ? 280 : 220,
+    minWidth: isCoarsePointer() ? 250 : 200,
+    className: "carousel-leaflet-popup",
+    closeButton: isCoarsePointer(),
+    autoPanPadding: isCoarsePointer() ? [18, 18] : [8, 8],
   });
   marker.openPopup();
 
@@ -324,7 +375,7 @@ function setupLightbox() {
 
   window.openLightbox = function(i) {
     currentIdx = i;
-    const t = TOKENS[i];
+    const t = DISPLAY_TOKENS[i];
     lbImg.src              = t.img;
     lbImg.alt              = t.name;
     lbTitle.textContent    = t.name;
@@ -360,7 +411,7 @@ function setupLightbox() {
           setTimeout(() => {
             mapInstance.flyTo([t.lat, t.lng], 10, { duration: 1.2 });
             const pin = pinsByTokenId[t.tokenId];
-            if (pin) showCarousel(pin, TOKENS.filter(x =>
+            if (pin) showCarousel(pin, DISPLAY_TOKENS.filter(x =>
               x.lat?.toFixed(4) === t.lat.toFixed(4) && x.lng?.toFixed(4) === t.lng.toFixed(4)));
             document.getElementById("map-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
           }, 350);
@@ -389,7 +440,7 @@ function setupLightbox() {
   function closeLightbox() { lb.classList.remove("open"); document.body.style.overflow = ""; }
   window.closeLightbox = closeLightbox;
 
-  const step = d => openLightbox((currentIdx + d + TOKENS.length) % TOKENS.length);
+  const step = d => openLightbox((currentIdx + d + DISPLAY_TOKENS.length) % DISPLAY_TOKENS.length);
 
   document.getElementById("lb-close").addEventListener("click", closeLightbox);
   lb.addEventListener("click", e => { if (e.target === lb) closeLightbox(); });

@@ -21,12 +21,6 @@ function attr(meta, name) {
   return a?.value ?? null;
 }
 
-function localImageFor(name) {
-  const n = name.toLowerCase();
-  const key = Object.keys(LOCAL_IMAGES).find(k => n.includes(k) || k.includes(n.split(/[–—,]/)[0].trim()));
-  return key ? LOCAL_IMAGES[key] : null;
-}
-
 function knownDetailsFor(name, description = "") {
   const haystack = `${name || ""} ${description || ""}`.toLowerCase();
   return KNOWN_TOKEN_DETAILS.find(item => haystack.includes(item.match)) || null;
@@ -218,8 +212,7 @@ async function loadAllTokens() {
   TOKENS = raw.map(t => {
     const meta   = t.metadata || {};
     const name   = meta.name || `Token #${t.tokenId}`;
-    const imgUri = ipfsToHttp(meta.displayUri || meta.artifactUri);
-    const local  = localImageFor(name);
+    const imgUri = ipfsToHttp(meta.displayUri || meta.artifactUri || meta.thumbnailUri || meta.image);
     const known  = knownDetailsFor(name, meta.description);
 
     // Check if on-chain attributes already have coords (future-proof)
@@ -233,7 +226,7 @@ async function loadAllTokens() {
       tokenId:  t.tokenId,
       name,
       subtitle: meta.description || "",
-      img:      local || imgUri || "",
+      img:      imgUri || "",
       ipfsImg:  imgUri,
       supply:   parseInt(t.totalSupply) || 0,
       holders:  t.holdersCount || 0,
