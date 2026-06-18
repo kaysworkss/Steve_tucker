@@ -519,7 +519,9 @@ async function markWalletOwned(address) {
       : `You hold ${count} Tucker sketches — marked in the gallery.`;
     document.querySelectorAll(".collector-row").forEach(r =>
       r.classList.toggle("is-me", r.dataset.addr === address));
+    return count;
   } catch (err) {
     console.warn("Wallet holdings error:", err);
+    return 0;
   }
 }
