@@ -3,6 +3,9 @@
 let mapInstance, markersLayer;
 let currentIdx = 0;
 let DISPLAY_TOKENS = [];
+let OWNED_TOKEN_IDS = new Set();
+let ACTIVE_WALLET_ADDRESS = "";
+let collectionMode = "all";
 const pinsByTokenId  = {};
 const activeCarousel = {};
 
@@ -185,6 +188,7 @@ function addCard(token, i) {
   const card = document.createElement("article");
   card.className = "sketch-card";
   card.dataset.tokenId = token.tokenId;
+  card.dataset.relatedTokenIds = [token.tokenId, ...(token.relatedTokens || [])].map(String).join(",");
   card.setAttribute("tabindex", "0");
   card.setAttribute("role", "button");
   card.setAttribute("aria-label", `View ${token.name}`);
@@ -202,14 +206,25 @@ function addCard(token, i) {
   card.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") openLightbox(i); });
   grid.appendChild(card);
   if (token.listed !== null) updateCardAvailability(card, token);
+  updateCardOwnedState(card);
 }
 
 // ── Map pin + carousel popup ──────────────────────────────────────────────────
-const PIN_SVG = `<svg width="18" height="26" viewBox="0 0 18 26" xmlns="http://www.w3.org/2000/svg">
+function pinSvg(owned = false) {
+  const fill = owned ? "#4a6650" : "#7c3317";
+  const ring = owned ? "#d8c07a" : "#f0ebe0";
+  return `<svg width="22" height="30" viewBox="0 0 22 30" xmlns="http://www.w3.org/2000/svg">
   <ellipse cx="9" cy="25" rx="4" ry="1.3" fill="rgba(22,18,12,0.18)"/>
-  <path d="M9 0C4.03 0 0 4.03 0 9c0 6.3 9 16 9 16S18 15.3 18 9C18 4.03 13.97 0 9 0z" fill="#7c3317"/>
-  <circle cx="9" cy="9" r="3.5" fill="#f0ebe0"/>
+  <path d="M11 0C4.93 0 0 4.93 0 11c0 7.7 11 19 11 19s11-11.3 11-19C22 4.93 17.07 0 11 0z" fill="${fill}"/>
+  ${owned ? `<path d="M11 3.2a7.8 7.8 0 1 1 0 15.6 7.8 7.8 0 0 1 0-15.6z" fill="none" stroke="${ring}" stroke-width="1.4"/>` : ""}
+  <circle cx="11" cy="11" r="3.8" fill="#f0ebe0"/>
 </svg>`;
+}
+
+function tokenIsOwned(token) {
+  const ids = [token?.tokenId, ...(token?.relatedTokens || [])].map(String);
+  return ids.some(id => OWNED_TOKEN_IDS.has(id));
+}
 
 function addPin(token) {
   if (!window.L || !markersLayer || !token.lat || !token.lng) return;
@@ -228,7 +243,7 @@ function addPin(token) {
   if (existingTid) { pinsByTokenId[token.tokenId] = pinsByTokenId[existingTid]; return; }
 
   const marker = L.marker([token.lat, token.lng], {
-    icon: L.divIcon({ className: "", html: PIN_SVG, iconSize: [18,26], iconAnchor: [9,26], popupAnchor: [0,-28] })
+    icon: markerIconForGroup(grouped)
   });
 
   marker.on("mouseover", () => showCarousel(marker, grouped));
@@ -240,6 +255,34 @@ function addPin(token) {
 
   markersLayer.addLayer(marker);
   pinsByTokenId[token.tokenId] = marker;
+}
+
+function markerIconForGroup(tokens) {
+  const owned = tokens.some(tokenIsOwned);
+  return L.divIcon({
+    className: owned ? "map-pin-icon map-pin-owned" : "map-pin-icon",
+    html: pinSvg(owned),
+    iconSize: [22, 30],
+    iconAnchor: [11, 30],
+    popupAnchor: [0, -30],
+  });
+}
+
+function refreshOwnedPins() {
+  if (!window.L) return;
+  const seen = new Set();
+  Object.entries(pinsByTokenId).forEach(([tokenId, marker]) => {
+    if (!marker || seen.has(marker)) return;
+    seen.add(marker);
+    const token = DISPLAY_TOKENS.find(t => String(t.tokenId) === String(tokenId));
+    if (!token?.lat || !token?.lng) return;
+    const grouped = DISPLAY_TOKENS.filter(t =>
+      t.lat && t.lng &&
+      t.lat.toFixed(4) === token.lat.toFixed(4) &&
+      t.lng.toFixed(4) === token.lng.toFixed(4)
+    );
+    marker.setIcon(markerIconForGroup(grouped));
+  });
 }
 
 function isCoarsePointer() {
@@ -453,6 +496,99 @@ function setupLightbox() {
     if (e.key === "ArrowRight") step(1);
   });
 }
+
+function setupCollectionControls() {
+  const panel = document.getElementById("my-collection");
+  if (!panel || panel.querySelector(".my-col-actions")) return;
+  const actions = document.createElement("div");
+  actions.className = "my-col-actions";
+  actions.innerHTML = `
+    <button type="button" class="my-col-action active" data-mode="all">All sketches</button>
+    <button type="button" class="my-col-action" data-mode="owned">My sketches</button>
+    <button type="button" class="my-col-action" data-mode="map">My places on map</button>
+  `;
+  panel.appendChild(actions);
+  actions.addEventListener("click", e => {
+    const btn = e.target.closest("button[data-mode]");
+    if (!btn) return;
+    collectionMode = btn.dataset.mode;
+    actions.querySelectorAll(".my-col-action").forEach(b => b.classList.toggle("active", b === btn));
+    applyCollectionMode();
+  });
+}
+
+function updateCardOwnedState(card) {
+  if (!card) return false;
+  const ids = (card.dataset.relatedTokenIds || card.dataset.tokenId || "").split(",").filter(Boolean);
+  const owned = ids.some(id => OWNED_TOKEN_IDS.has(String(id)));
+  card.classList.toggle("is-owned", owned);
+  card.hidden = collectionMode === "owned" && !owned;
+  const existing = card.querySelector(".card-owned");
+  if (owned && !existing) {
+    const b = document.createElement("div");
+    b.className = "card-owned";
+    b.textContent = "In your collection";
+    card.appendChild(b);
+  } else if (!owned && existing) {
+    existing.remove();
+  }
+  return owned;
+}
+
+function applyCollectionMode() {
+  const ownedCards = [];
+  const otherCards = [];
+  document.querySelectorAll(".sketch-card").forEach(card => {
+    (updateCardOwnedState(card) ? ownedCards : otherCards).push(card);
+  });
+
+  const grid = document.getElementById("gallery");
+  if (grid) [...ownedCards, ...otherCards].forEach(card => grid.appendChild(card));
+
+  document.getElementById("gallery-section")?.classList.toggle("show-owned-only", collectionMode === "owned");
+  document.getElementById("map-section")?.classList.toggle("show-owned-map", collectionMode === "map");
+
+  if (collectionMode === "owned") {
+    document.getElementById("gallery-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  if (collectionMode === "map") {
+    document.getElementById("map-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    fitMapToOwnedPins();
+  }
+}
+
+function fitMapToOwnedPins() {
+  if (!mapInstance || !markersLayer || OWNED_TOKEN_IDS.size === 0) return;
+  const ownedLatLngs = DISPLAY_TOKENS
+    .filter(t => tokenIsOwned(t) && t.lat && t.lng)
+    .map(t => [t.lat, t.lng]);
+  if (!ownedLatLngs.length) return;
+  mapInstance.fitBounds(L.latLngBounds(ownedLatLngs).pad(0.22), { maxZoom: isCoarsePointer() ? 7 : 6 });
+}
+
+window.applyWalletCollectionState = function(address, holdings = []) {
+  ACTIVE_WALLET_ADDRESS = address || "";
+  window.ACTIVE_TUCKER_WALLET = ACTIVE_WALLET_ADDRESS;
+  const ownedIds = holdings.map(h => String(h.token?.tokenId ?? h.tokenId)).filter(Boolean);
+  OWNED_TOKEN_IDS = new Set(ownedIds);
+  setupCollectionControls();
+  applyCollectionMode();
+  refreshOwnedPins();
+  document.querySelectorAll(".collector-row").forEach(r =>
+    r.classList.toggle("is-me", r.dataset.addr === address));
+};
+
+window.clearWalletCollectionState = function() {
+  OWNED_TOKEN_IDS = new Set();
+  ACTIVE_WALLET_ADDRESS = "";
+  window.ACTIVE_TUCKER_WALLET = "";
+  collectionMode = "all";
+  document.querySelectorAll(".my-col-action").forEach(btn =>
+    btn.classList.toggle("active", btn.dataset.mode === "all"));
+  applyCollectionMode();
+  refreshOwnedPins();
+  document.querySelectorAll(".collector-row.is-me").forEach(r => r.classList.remove("is-me"));
+};
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 function showToast(message) {

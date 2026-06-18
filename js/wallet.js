@@ -323,8 +323,7 @@
     }
     setWalletButton("idle", "Connect Wallet");
     document.getElementById("my-collection")?.classList.remove("visible");
-    document.querySelectorAll(".card-owned").forEach(b => b.remove());
-    document.querySelectorAll(".collector-row.is-me").forEach(r => r.classList.remove("is-me"));
+    window.clearWalletCollectionState?.();
   }
 
   function showCollectorThanks(address, count) {

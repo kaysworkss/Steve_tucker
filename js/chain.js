@@ -489,6 +489,11 @@ async function renderCollectors() {
         <thead><tr><th>#</th><th>Collector</th><th>Held</th><th>Works</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
+    const activeWallet = window.ACTIVE_TUCKER_WALLET || "";
+    if (activeWallet) {
+      document.querySelectorAll(".collector-row").forEach(r =>
+        r.classList.toggle("is-me", r.dataset.addr === activeWallet));
+    }
   } catch (err) {
     console.error(err);
     wrap.innerHTML = `<p class="collectors-empty">Could not reach the blockchain. Reload to try again.</p>`;
@@ -499,26 +504,16 @@ async function markWalletOwned(address) {
   try {
     const holdings = await loadWalletHoldings(address);
     const ownedIds = new Set(holdings.map(h => String(h.token.tokenId)));
-    let count = 0;
-    document.querySelectorAll(".sketch-card").forEach(card => {
-      const existing = card.querySelector(".card-owned");
-      if (ownedIds.has(String(card.dataset.tokenId))) {
-        count++;
-        if (!existing) {
-          const b = document.createElement("div");
-          b.className = "card-owned";
-          b.textContent = "Collected";
-          card.appendChild(b);
-        }
-      } else if (existing) existing.remove();
-    });
+    const count = [...document.querySelectorAll(".sketch-card")].filter(card => {
+      const ids = (card.dataset.relatedTokenIds || card.dataset.tokenId || "").split(",").filter(Boolean);
+      return ids.some(id => ownedIds.has(String(id)));
+    }).length;
     document.getElementById("my-col-count").textContent = count;
     document.getElementById("my-col-sub").textContent = count === 0
       ? "You don't hold any Tucker sketches yet."
-      : count === 1 ? "You hold 1 Tucker sketch — marked in the gallery."
-      : `You hold ${count} Tucker sketches — marked in the gallery.`;
-    document.querySelectorAll(".collector-row").forEach(r =>
-      r.classList.toggle("is-me", r.dataset.addr === address));
+      : count === 1 ? "You hold 1 Tucker sketch. It has moved to the top of the gallery."
+      : `You hold ${count} Tucker sketches. They have moved to the top of the gallery.`;
+    window.applyWalletCollectionState?.(address, holdings);
     return count;
   } catch (err) {
     console.warn("Wallet holdings error:", err);
