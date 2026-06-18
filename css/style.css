@@ -340,11 +340,19 @@ body {
 
 /* Tweet fallback card */
 .tweet-card {
+  display: block;
   background: var(--paper-2);
   border: 1px solid var(--line-strong);
   padding: 20px;
   max-width: 520px;
   justify-self: center;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+.tweet-card--preview:hover {
+  background: var(--paper-3);
+  border-color: rgba(22,18,12,0.45);
 }
 .tweet-header {
   display: flex;
@@ -353,7 +361,7 @@ body {
   margin-bottom: 14px;
 }
 .tweet-avatar {
-  width: 38px; height: 38px;
+  width: 40px; height: 40px;
   border-radius: 50%;
   background: var(--ink);
   color: var(--paper);
@@ -362,21 +370,19 @@ body {
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
-.tweet-meta { flex: 1; display: flex; flex-direction: column; gap: 1px; }
-.tweet-name { font-weight: 600; font-size: 0.88rem; color: var(--ink); }
+.tweet-meta { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.tweet-name { font-weight: 600; font-size: 0.9rem; color: var(--ink); }
 .tweet-handle { font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-3); }
-.tweet-x-logo { color: var(--ink-3); transition: color 0.15s; }
-.tweet-x-logo:hover { color: var(--ink); }
+.tweet-x-logo { color: var(--ink-3); flex-shrink: 0; }
 .tweet-body {
-  font-size: 0.95rem;
-  line-height: 1.65;
-  color: var(--ink-2);
-  font-style: italic;
+  font-size: 0.96rem;
+  line-height: 1.68;
+  color: var(--ink);
   margin-bottom: 16px;
 }
 .tweet-footer {
   display: flex; align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
@@ -384,18 +390,9 @@ body {
   font-family: var(--font-mono);
   font-size: 0.6rem;
   letter-spacing: 0.075em;
-  color: var(--ink-3);
-  text-transform: uppercase;
-}
-.tweet-cta {
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.075em;
-  text-transform: uppercase;
   color: var(--rust);
-  text-decoration: none;
+  text-transform: uppercase;
 }
-.tweet-cta:hover { text-decoration: underline; }
 
 /* ─── MAP ─────────────────────────────────────────────────────────────────── */
 #map-section { border-bottom: 1px solid var(--line-strong); padding-bottom: 0; }
