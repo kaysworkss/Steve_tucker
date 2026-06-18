@@ -32,27 +32,16 @@ function dateFromDescription(description = "") {
     || "";
 }
 
+// Parse Steve's description format: "Place Name\n\nDate"  
 function locFromDescription(description = "") {
   if (!description.trim()) return "";
-
-  // Split on blank line (the separator Steve uses between place and date)
   const parts = description.split(/\n\n+/).map(s => s.trim()).filter(Boolean);
-
-  // If there's more than one part, everything before the last part is location
   if (parts.length >= 2) {
-    const loc = parts.slice(0, -1)
-      .join(", ")
-      .replace(/\n+/g, ", ") // normalize any single newlines within the loc
-      .trim();
-    // Make sure we're not returning a date string as the location
+    const loc = parts.slice(0, -1).join(", ").replace(/\n+/g, ", ").trim();
     if (!dateFromDescription(loc) || loc.length > 20) return loc;
   }
-
-  // Single part — check if it's just a date; if so, no location
-  const single = parts[0]?.replace(/\n+/g, ", ").trim() || "";
+  const single = (parts[0] || "").replace(/\n+/g, ", ").trim();
   if (dateFromDescription(single) && single.length < 30) return "";
-
-  // Single part that's not a date: treat as location
   return single;
 }
 
@@ -245,7 +234,6 @@ async function loadAllTokens() {
 
     // Check cache
     const cached = cache[t.tokenId];
-    const descLoc = locFromDescription(meta.description);
 
     return {
       tokenId:  t.tokenId,
@@ -265,29 +253,25 @@ async function loadAllTokens() {
       streetView: !!known?.streetView,
       placePhotos: !!known?.placePhotos,
       photoQuery: known?.photoQuery || known?.loc || "",
-      // lat/lng start null; filled by applyCoords if a location can be resolved.
-      // If coords can't be resolved (e.g. a cruise at sea), no pin is placed — that's fine.
+      // From chain attributes (if Tucker adds them later)
       lat:      isNaN(latAttr) ? known?.lat ?? null : latAttr,
       lng:      isNaN(lngAttr) ? known?.lng ?? null : lngAttr,
-      loc:      cached?.loc  || attr(meta, "location") || known?.loc || descLoc || "",
+      // From cache (previously extracted by vision)
+      loc:      cached?.loc  || attr(meta, "location") || known?.loc || locFromDescription(meta.description) || "",
       date:     cached?.date || attr(meta, "date") || known?.date || dateFromDescription(meta.description),
-      // needs vision only when: no cache, no known entry, no on-chain location attr,
-      // and description parsing yielded nothing either
-      _needsExtraction: !cached && isNaN(latAttr) && !known && !attr(meta, "location") && !descLoc,
+      // Will be filled by vision + geocoding
+      _needsExtraction: !cached && isNaN(latAttr) && !known && !attr(meta, "location") && !locFromDescription(meta.description),
     };
   });
 
-  // Apply cached coords — but evict stale entries where loc is known but coords are missing
-  // (these were created by a previous buggy version that blocked geocoding for some tokens)
+  // Apply cached coords — evict stale entries where loc exists but lat is missing
   const cacheToSave = { ...cache };
   let cacheModified = false;
   for (const t of TOKENS) {
     const cached = cache[t.tokenId];
     if (cached?.lat) {
-      t.lat = cached.lat;
-      t.lng = cached.lng;
+      t.lat = cached.lat; t.lng = cached.lng;
     } else if (cached && !cached.lat && (t.loc || cached.loc)) {
-      // We have a cache entry but no coords, and we now have a loc — evict so geocoding reruns
       delete cacheToSave[t.tokenId];
       cacheModified = true;
     }
@@ -425,39 +409,30 @@ async function fetchAvailability() {
 }
 
 async function applyCoords(onTokenReady) {
-  // Pass 1 — tokens that already have coords (from KNOWN_TOKEN_DETAILS or cache)
+  // Pass 1 — already have coords
   TOKENS.filter(t => t.lat && t.lng).forEach(t => onTokenReady?.(t));
-
   if (TOKENS.some(t => t._isFallback)) return;
 
-  // Pass 2 — tokens with a loc string but no coords yet: geocode the loc
-  const needsGeocode = TOKENS.filter(t => !t.lat && !t.lng && t.loc);
-  for (const token of needsGeocode) {
+  // Pass 2 — have loc, need geocoding
+  for (const token of TOKENS.filter(t => !t.lat && !t.lng && t.loc)) {
     const coords = await geocode(token.loc);
     if (coords) {
-      token.lat = coords.lat;
-      token.lng = coords.lng;
+      token.lat = coords.lat; token.lng = coords.lng;
       const cache = loadCache();
       cache[token.tokenId] = { ...cache[token.tokenId], lat: coords.lat, lng: coords.lng };
       saveCache(cache);
       onTokenReady?.(token);
     }
-    // If geocode returns null (e.g. "at sea on a cruise") — no pin, no error. Just move on.
     await new Promise(r => setTimeout(r, 300));
   }
 
-  // Pass 3 — tokens with no loc but a place-like name: try geocoding the name
-  const needsNameGeocode = TOKENS.filter(t =>
-    !t.lat && !t.lng && !t.loc &&
-    t.name && !t.name.startsWith("Token #") && !t._needsExtraction
-  );
-  for (const token of needsNameGeocode) {
-    const looksLikePlace = /,|beach|lake|park|river|canyon|mountain|island|falls|bay|cove|trail|camp|pueblo|ranch|gorge/i.test(token.name);
+  // Pass 3 — no loc but place-like name
+  for (const token of TOKENS.filter(t => !t.lat && !t.lng && !t.loc && t.name && !t._needsExtraction)) {
+    const looksLikePlace = /,|beach|lake|park|river|canyon|mountain|island|falls|bay|cove|trail|camp|pueblo|ranch|gorge|cozumel/i.test(token.name);
     if (!looksLikePlace) continue;
     const coords = await geocode(token.name);
     if (coords) {
-      token.lat = coords.lat;
-      token.lng = coords.lng;
+      token.lat = coords.lat; token.lng = coords.lng;
       token.loc = token.loc || token.name;
       const cache = loadCache();
       cache[token.tokenId] = { ...cache[token.tokenId], lat: coords.lat, lng: coords.lng, loc: token.loc };
@@ -467,12 +442,9 @@ async function applyCoords(onTokenReady) {
     await new Promise(r => setTimeout(r, 300));
   }
 
-  // Pass 4 — truly unknown tokens: use Claude vision on the sketch image
+  // Pass 4 — truly unknown: vision extraction
   const needsVision = TOKENS.filter(t => !t.lat && !t.lng && !t.loc && t.ipfsImg && t._needsExtraction);
-  if (!needsVision.length) return;
-  await enrichTokensWithVision(token => {
-    onTokenReady?.(token);
-  });
+  if (needsVision.length) await enrichTokensWithVision(token => onTokenReady?.(token));
 }
 
 function startLiveUpdates() {
@@ -509,58 +481,30 @@ async function renderCollectors() {
   try {
     const balances = await loadAllHolders();
     const byAddr   = {};
-
     for (const b of balances) {
       const addr = b.account.address;
       if (addr === BURN_ADDRESS || MARKET_CONTRACTS.has(addr)) continue;
-      if (!byAddr[addr]) byAddr[addr] = {
-        tokenIds: new Set(),   // unique works
-        name: ACCOUNT_NAMES[addr] || b.account.alias || "",
-      };
+      if (!byAddr[addr]) byAddr[addr] = { tokenIds: new Set(), name: ACCOUNT_NAMES[addr] || b.account.alias || "" };
       if (b.account.alias && !byAddr[addr].name) byAddr[addr].name = b.account.alias;
       byAddr[addr].tokenIds.add(b.token.tokenId);
     }
-
     await hydrateAccountNames(Object.keys(byAddr));
-    for (const [addr, info] of Object.entries(byAddr)) {
-      info.name = ACCOUNT_NAMES[addr] || info.name;
-    }
+    for (const [addr, info] of Object.entries(byAddr)) info.name = ACCOUNT_NAMES[addr] || info.name;
 
-    // Sort by number of unique works descending
-    const entries = Object.entries(byAddr).sort((a, b) =>
-      b[1].tokenIds.size - a[1].tokenIds.size
-    );
-
+    const entries = Object.entries(byAddr).sort((a, b) => b[1].tokenIds.size - a[1].tokenIds.size);
     const totalEl = document.getElementById("collectors-total");
     if (totalEl) totalEl.textContent = `${entries.length} collector${entries.length !== 1 ? "s" : ""}`;
-
-    if (entries.length === 0) {
-      wrap.innerHTML = `<p class="collectors-empty">No collectors found on-chain yet.</p>`;
-      return;
-    }
+    if (!entries.length) { wrap.innerHTML = `<p class="collectors-empty">No collectors found on-chain yet.</p>`; return; }
 
     const rows = entries.map(([addr, info], i) => {
-      const short       = shortAddress(addr);
+      const short = shortAddress(addr);
       const displayName = info.name || short;
-      const addrLine    = info.name ? short : "";
-      const uniqueCount = info.tokenIds.size;
-
-      // Resolve token names
-      const workNames = [...info.tokenIds].map(tid =>
-        TOKENS.find(t => t.tokenId == tid)?.name || `#${tid}`
-      );
-
-      // First two always visible; rest toggle open
-      const rowId   = `works-${addr.slice(-8)}`;
-      const visible = workNames.slice(0, 2).map(n =>
-        `<span class="work-pill">${n}</span>`).join("");
-      const hidden  = workNames.slice(2).map(n =>
-        `<span class="work-pill">${n}</span>`).join("");
-      const toggle  = hidden
-        ? `<button class="works-toggle" aria-expanded="false" aria-controls="${rowId}"
-              onclick="toggleWorks(this,'${rowId}')">+${workNames.length - 2} more</button>
-           <span class="works-extra" id="${rowId}" hidden>${hidden}</span>` : "";
-
+      const addrLine = info.name ? short : "";
+      const workNames = [...info.tokenIds].map(tid => TOKENS.find(t => t.tokenId == tid)?.name || `#${tid}`);
+      const rowId = `works-${addr.slice(-8)}`;
+      const visible = workNames.slice(0, 2).map(n => `<span class="work-pill">${n}</span>`).join("");
+      const hidden  = workNames.slice(2).map(n => `<span class="work-pill">${n}</span>`).join("");
+      const toggle  = hidden ? `<button class="works-toggle" aria-expanded="false" aria-controls="${rowId}" onclick="toggleWorks(this,'${rowId}')">+${workNames.length - 2} more</button><span class="works-extra" id="${rowId}" hidden>${hidden}</span>` : "";
       return `<tr class="collector-row" data-addr="${addr}">
         <td class="col-rank">${i + 1}</td>
         <td class="col-addr">
@@ -573,26 +517,14 @@ async function renderCollectors() {
             <a href="https://objkt.com/profile/${addr}/collected" target="_blank" rel="noopener">objkt ↗</a>
           </span>
         </td>
-        <td class="col-count"><span class="collector-count">${uniqueCount}</span></td>
-        <td class="col-works">
-          <div class="works-list">${visible}${toggle}</div>
-        </td>
+        <td class="col-count"><span class="collector-count">${info.tokenIds.size}</span></td>
+        <td class="col-works"><div class="works-list">${visible}${toggle}</div></td>
       </tr>`;
     }).join("");
 
-    wrap.innerHTML = `
-      <table class="collectors-table">
-        <thead><tr>
-          <th>#</th><th>Collector</th><th>Works</th><th>Titles</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table>`;
-
+    wrap.innerHTML = `<table class="collectors-table"><thead><tr><th>#</th><th>Collector</th><th>Works</th><th>Titles</th></tr></thead><tbody>${rows}</tbody></table>`;
     const activeWallet = window.ACTIVE_TUCKER_WALLET || "";
-    if (activeWallet) {
-      document.querySelectorAll(".collector-row").forEach(r =>
-        r.classList.toggle("is-me", r.dataset.addr === activeWallet));
-    }
+    if (activeWallet) document.querySelectorAll(".collector-row").forEach(r => r.classList.toggle("is-me", r.dataset.addr === activeWallet));
   } catch (err) {
     console.error(err);
     wrap.innerHTML = `<p class="collectors-empty">Could not reach the blockchain. Reload to try again.</p>`;
@@ -605,9 +537,7 @@ window.toggleWorks = function(btn, id) {
   const open = btn.getAttribute("aria-expanded") === "true";
   el.hidden = open;
   btn.setAttribute("aria-expanded", String(!open));
-  btn.textContent = open
-    ? `+${el.querySelectorAll(".work-pill").length} more`
-    : "Show less";
+  btn.textContent = open ? `+${el.querySelectorAll(".work-pill").length} more` : "Show less";
 };
 
 async function markWalletOwned(address) {

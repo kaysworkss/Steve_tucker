@@ -48,14 +48,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   await applyCoords(token => {
     if (DISPLAY_TOKENS.some(t => String(t.tokenId) === String(token.tokenId))) {
       addPin(token);
-      refreshCardMapAction(token);
+      // Reveal map button on card now that we have coords
+      const card = document.querySelector(\`.sketch-card[data-token-id="\${token.tokenId}"]\`)
+        || [...document.querySelectorAll(".sketch-card")].find(c => c.dataset.tokenId == token.tokenId);
+      if (card) card.querySelector("[data-map-action]")?.classList.remove("card-action--hidden");
     }
   });
   fitMapToPins();
   renderCollectors();
 
   startLiveUpdates(newToken => {
-    DISPLAY_TOKENS = uniqueArtworkTokens(TOKENS);
+    DISPLAY_TOKENS = sortTokensForDisplay(uniqueArtworkTokens(TOKENS));
     const i = DISPLAY_TOKENS.findIndex(t => String(t.tokenId) === String(newToken.tokenId));
     if (i >= 0) addCard(DISPLAY_TOKENS[i], i);
     if (newToken.lat && newToken.lng) addPin(newToken);
@@ -100,25 +103,14 @@ function artworkRank(token) {
   return score;
 }
 
-// Sort so live auctions + open editions rise to the top,
-// then collected works, then unlisted / artist-held.
+// Sort: live auctions → open editions → artist-held → collected → burned
 function sortTokensForDisplay(tokens) {
-  const PRIORITY = {
-    auction: 0,   // live on auction — highest
-    open:    1,   // editions still available
-    artist:  2,   // held by artist, not yet listed
-    sold:    3,   // all collected
-    burned:  4,   // burned
-    "":      5,   // unknown / loading
-  };
+  const PRIORITY = { auction:0, open:1, artist:2, sold:3, burned:4, "":5 };
   return [...tokens].sort((a, b) => {
     const pa = PRIORITY[a.availabilityKind] ?? 5;
     const pb = PRIORITY[b.availabilityKind] ?? 5;
     if (pa !== pb) return pa - pb;
-    // Within same tier, more editions left → higher
-    const la = a.listed ?? 0;
-    const lb = b.listed ?? 0;
-    return lb - la;
+    return (b.listed ?? 0) - (a.listed ?? 0);
   });
 }
 
@@ -186,6 +178,26 @@ function updateCardAvailability(card, token) {
   const body = card.querySelector(".card-body");
   body.appendChild(div);
   body.insertAdjacentHTML("beforeend", collectorLine(token));
+  if (streetViewUrl(token)) {
+    const a = document.createElement("a");
+    a.className = "street-link";
+    a.href = streetViewUrl(token);
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = "Street view";
+    a.addEventListener("click", e => e.stopPropagation());
+    body.appendChild(a);
+  }
+  if (placePhotosUrl(token)) {
+    const a = document.createElement("a");
+    a.className = "street-link place-photos-link";
+    a.href = placePhotosUrl(token);
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = "Place photos";
+    a.addEventListener("click", e => e.stopPropagation());
+    body.appendChild(a);
+  }
 }
 // ── Gallery card ──────────────────────────────────────────────────────────────
 function addCard(token, i) {
@@ -197,10 +209,7 @@ function addCard(token, i) {
   card.setAttribute("tabindex", "0");
   card.setAttribute("role", "button");
   card.setAttribute("aria-label", `View ${token.name}`);
-
-  // Map action — only wired if coords exist at render time; refreshed by updateCardPin
   const hasPin = !!(token.lat && token.lng);
-
   card.innerHTML = `
     <div class="card-img-wrap">
       <img class="card-img" src="${token.img}" alt="${token.name}" loading="lazy"
@@ -215,43 +224,28 @@ function addCard(token, i) {
       <p class="card-loc">${token.loc || "—"}</p>
       <p class="card-date">${token.date || ""}</p>
     </div>`;
-
-  // "View details" opens lightbox
   card.addEventListener("click", e => {
-    if (e.target.closest("[data-map-action]")) return; // let map action handle it
+    if (e.target.closest("[data-map-action]")) return;
     openLightbox(i);
   });
   card.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") openLightbox(i); });
-
-  // "View on map" — scroll + fly to pin
   const mapBtn = card.querySelector("[data-map-action]");
   if (mapBtn) {
     mapBtn.addEventListener("click", e => {
       e.stopPropagation();
       if (!token.lat || !token.lng) return;
-      document.getElementById("map-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      document.getElementById("map-section")?.scrollIntoView({ behavior:"smooth", block:"center" });
       setTimeout(() => {
         if (mapInstance) mapInstance.flyTo([token.lat, token.lng], 10, { duration: 1.1 });
         const pin = pinsByTokenId[token.tokenId];
         if (pin) showCarousel(pin, DISPLAY_TOKENS.filter(x =>
-          x.lat?.toFixed(4) === token.lat.toFixed(4) &&
-          x.lng?.toFixed(4) === token.lng.toFixed(4)));
+          x.lat?.toFixed(4) === token.lat.toFixed(4) && x.lng?.toFixed(4) === token.lng.toFixed(4)));
       }, 400);
     });
   }
-
   grid.appendChild(card);
   if (token.listed !== null) updateCardAvailability(card, token);
   updateCardOwnedState(card);
-}
-
-// Called when a pin is added after the card already rendered (geocoding is async)
-function refreshCardMapAction(token) {
-  const card = document.querySelector(`.sketch-card[data-token-id="${token.tokenId}"]`)
-    || [...document.querySelectorAll(".sketch-card")].find(c => c.dataset.tokenId == token.tokenId);
-  if (!card) return;
-  const mapBtn = card.querySelector("[data-map-action]");
-  if (mapBtn) mapBtn.classList.remove("card-action--hidden");
 }
 
 // ── Map pin + carousel popup ──────────────────────────────────────────────────
@@ -649,33 +643,18 @@ document.addEventListener("DOMContentLoaded", () => {
   const hamburger = document.getElementById("nav-hamburger");
   const nav       = document.getElementById("main-nav");
   if (!hamburger || !nav) return;
-
   function toggleMenu(open) {
     hamburger.classList.toggle("open", open);
     nav.classList.toggle("open", open);
     hamburger.setAttribute("aria-expanded", String(open));
     document.body.style.overflow = open ? "hidden" : "";
   }
-
-  hamburger.addEventListener("click", () => {
-    toggleMenu(!nav.classList.contains("open"));
-  });
-
-  // Close when a nav link is tapped
-  nav.querySelectorAll("a").forEach(link => {
-    link.addEventListener("click", () => toggleMenu(false));
-  });
-
-  // Close on outside tap
+  hamburger.addEventListener("click", () => toggleMenu(!nav.classList.contains("open")));
+  nav.querySelectorAll("a").forEach(link => link.addEventListener("click", () => toggleMenu(false)));
   document.addEventListener("click", e => {
-    if (nav.classList.contains("open") &&
-        !nav.contains(e.target) &&
-        !hamburger.contains(e.target)) {
+    if (nav.classList.contains("open") && !nav.contains(e.target) && !hamburger.contains(e.target))
       toggleMenu(false);
-    }
   });
-
-  // Close on Escape
   document.addEventListener("keydown", e => {
     if (e.key === "Escape" && nav.classList.contains("open")) toggleMenu(false);
   });
