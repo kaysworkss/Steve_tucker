@@ -1,4 +1,4 @@
-﻿// ─── APP.JS ───────────────────────────────────────────────────────────────────
+// ─── APP.JS ───────────────────────────────────────────────────────────────────
 
 let mapInstance, markersLayer;
 let currentIdx = 0;
@@ -48,9 +48,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   await applyCoords(token => {
     if (DISPLAY_TOKENS.some(t => String(t.tokenId) === String(token.tokenId))) {
       addPin(token);
-      // Reveal map button on card now that we have coords
-      const card = document.querySelector(\`.sketch-card[data-token-id="\${token.tokenId}"]\`)
-        || [...document.querySelectorAll(".sketch-card")].find(c => c.dataset.tokenId == token.tokenId);
+      const card = [...document.querySelectorAll(".sketch-card")]
+        .find(c => c.dataset.tokenId == token.tokenId);
       if (card) card.querySelector("[data-map-action]")?.classList.remove("card-action--hidden");
     }
   });
