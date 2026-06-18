@@ -985,9 +985,17 @@ footer {
   :root { --header-h: 52px; }
 
   /* Header */
-  .site-header { padding: 0 16px; }
-  .site-logo { flex: 1 1 auto; font-size: 0.88rem; }
-  #wallet-btn { padding: 6px 10px; font-size: 0.55rem; }
+  .site-header {
+    padding: 0 16px;
+  }
+  .site-logo {
+    flex: 1 1 auto;
+    font-size: 0.86rem;
+  }
+  #wallet-btn {
+    padding: 6px 10px;
+    font-size: 0.55rem;
+  }
   .header-right { gap: 8px; }
 
   /* Hamburger */
@@ -1001,11 +1009,12 @@ footer {
     background: var(--paper);
     border-bottom: 1px solid var(--line-strong);
     z-index: 1999;
-    transform: translateY(-110%);
+    display: none;
+    transform: none;
     transition: transform 0.25s ease;
     pointer-events: none;
   }
-  #main-nav.open { transform: translateY(0); pointer-events: auto; }
+  #main-nav.open { display: block; pointer-events: auto; }
   .nav-links {
     display: flex;
     flex-direction: column;
