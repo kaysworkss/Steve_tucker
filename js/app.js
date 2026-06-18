@@ -2,63 +2,95 @@
 
 let mapInstance, markersLayer;
 let currentIdx = 0;
-const pinsByTokenId = {};
+const pinsByTokenId  = {};
+const activeCarousel = {};
 
 document.addEventListener("DOMContentLoaded", async () => {
   const grid    = document.getElementById("gallery");
   const counter = document.getElementById("sketch-count");
   grid.innerHTML = `<p class="loading-msg" style="grid-column:1/-1">Loading from the blockchain…</p>`;
 
-  // Init map early
   mapInstance = L.map("map", { scrollWheelZoom: false }).setView([36, -100], 4);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: "© <a href='https://openstreetmap.org'>OpenStreetMap</a>", maxZoom: 18,
   }).addTo(mapInstance);
   markersLayer = L.layerGroup().addTo(mapInstance);
 
-  // Load tokens from chain
   try { await loadAllTokens(); }
-  catch (err) {
+  catch {
     grid.innerHTML = `<p class="loading-msg" style="grid-column:1/-1">Could not reach the blockchain. Reload to try again.</p>`;
     return;
   }
 
-  if (counter) counter.textContent = TOKENS.length;
+  // Fetch availability in background — updates cards when ready
+  fetchAvailability().then(() => {
+    document.querySelectorAll(".sketch-card").forEach(card => {
+      const tid   = parseInt(card.dataset.tokenId);
+      const token = TOKENS.find(t => t.tokenId === tid);
+      if (token) updateCardAvailability(card, token);
+    });
+  });
 
-  // Build gallery
+  if (counter) counter.textContent = TOKENS.length;
   grid.innerHTML = "";
   TOKENS.forEach((t, i) => addCard(t, i));
 
-  // Apply coords instantly for known tokens, geocode unknowns in background
-  await applyCoords(token => addPin(token));
-
-  // Lightbox
+  // setupLightbox BEFORE applyCoords so openLightbox is defined when pins are clicked
   setupLightbox();
-
-  // Collectors
+  await applyCoords(token => addPin(token));
   renderCollectors();
 
-  // ── Live updates ────────────────────────────────────────────────────────────
-  startLiveUpdates((newToken) => {
-    // Add gallery card
-    const i = TOKENS.length - 1; // it was just pushed to TOKENS in chain.js
+  startLiveUpdates(newToken => {
+    const i = TOKENS.length - 1;
     addCard(newToken, i);
-
-    // Add map pin
     if (newToken.lat && newToken.lng) addPin(newToken);
-
-    // Update counter
     if (counter) counter.textContent = TOKENS.length;
-
-    // Toast notification
-    showToast(`New sketch minted: "${newToken.name}"`);
-
-    // Refresh collectors (new mint = new holder activity)
+    showToast(`New sketch: "${newToken.name}"`);
     renderCollectors();
   });
 });
 
-// ── Build a gallery card ──────────────────────────────────────────────────────
+// ── Availability ──────────────────────────────────────────────────────────────
+function availabilityBadge(token) {
+  if (token.listed === null) return "";
+  if (token.listed > 0) {
+    const edLabel = token.supply === 1 ? "1 of 1" : `${token.listed} of ${token.supply} left`;
+    const price   = token.price ? ` · ${token.price.toFixed(2)} ꜩ` : "";
+    return `<span class="avail-badge avail-open"><span class="avail-dot"></span>${edLabel}${price}</span>`;
+  }
+  if (token.soldOut) return `<span class="avail-badge avail-sold">Sold out</span>`;
+  return `<span class="avail-badge avail-unlisted">Not listed</span>`;
+}
+
+function updateCardAvailability(card, token) {
+  const existing = card.querySelector(".card-avail");
+  if (existing) existing.remove();
+  if (token.listed === null) return;
+
+  const div = document.createElement("div");
+  div.className = "card-avail";
+
+  const badge = availabilityBadge(token);
+
+  if (token.listed > 0) {
+    // Collect link — stopPropagation so it doesn't fire openLightbox
+    const a = document.createElement("a");
+    a.className = "collect-btn";
+    a.href = token.objktUrl;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = `Collect · ${token.price?.toFixed(2)} ꜩ`;
+    a.addEventListener("click", e => e.stopPropagation());
+    div.innerHTML = badge;
+    div.appendChild(a);
+  } else {
+    div.innerHTML = badge;
+  }
+
+  card.querySelector(".card-body").appendChild(div);
+}
+
+// ── Gallery card ──────────────────────────────────────────────────────────────
 function addCard(token, i) {
   const grid = document.getElementById("gallery");
   const card = document.createElement("article");
@@ -80,9 +112,10 @@ function addCard(token, i) {
   card.addEventListener("click", () => openLightbox(i));
   card.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") openLightbox(i); });
   grid.appendChild(card);
+  if (token.listed !== null) updateCardAvailability(card, token);
 }
 
-// ── Map pin ───────────────────────────────────────────────────────────────────
+// ── Map pin + carousel popup ──────────────────────────────────────────────────
 const PIN_SVG = `<svg width="18" height="26" viewBox="0 0 18 26" xmlns="http://www.w3.org/2000/svg">
   <ellipse cx="9" cy="25" rx="4" ry="1.3" fill="rgba(22,18,12,0.18)"/>
   <path d="M9 0C4.03 0 0 4.03 0 9c0 6.3 9 16 9 16S18 15.3 18 9C18 4.03 13.97 0 9 0z" fill="#7c3317"/>
@@ -90,33 +123,108 @@ const PIN_SVG = `<svg width="18" height="26" viewBox="0 0 18 26" xmlns="http://w
 </svg>`;
 
 function addPin(token) {
-  if (pinsByTokenId[token.tokenId] || !token.lat || !token.lng) return;
-  const idx    = TOKENS.findIndex(t => t.tokenId === token.tokenId);
+  if (!token.lat || !token.lng) return;
+
+  const grouped = TOKENS.filter(t =>
+    t.lat && t.lng &&
+    t.lat.toFixed(4) === token.lat.toFixed(4) &&
+    t.lng.toFixed(4) === token.lng.toFixed(4)
+  );
+
+  // Reuse existing pin at same location
+  const existingTid = Object.keys(pinsByTokenId).find(tid => {
+    const t = TOKENS.find(x => x.tokenId === parseInt(tid));
+    return t?.lat?.toFixed(4) === token.lat.toFixed(4) && t?.lng?.toFixed(4) === token.lng.toFixed(4);
+  });
+  if (existingTid) { pinsByTokenId[token.tokenId] = pinsByTokenId[existingTid]; return; }
+
   const marker = L.marker([token.lat, token.lng], {
     icon: L.divIcon({ className: "", html: PIN_SVG, iconSize: [18,26], iconAnchor: [9,26], popupAnchor: [0,-28] })
   });
-  marker.bindPopup(`
-    <div style="font-family:'Instrument Sans',sans-serif;min-width:155px;">
-      <strong style="font-family:'DM Serif Display',serif;font-size:0.95rem;display:block;margin-bottom:3px;">${token.name}</strong>
-      ${token.loc  ? `<span style="font-size:0.75rem;color:#7a6e5a;display:block;">${token.loc}</span>`  : ""}
-      ${token.date ? `<span style="font-size:0.7rem;color:#7a6e5a;font-style:italic;">${token.date}</span>` : ""}
-    </div>`);
-  marker.on("click", () => setTimeout(() => openLightbox(idx), 250));
+
+  marker.on("mouseover", () => showCarousel(marker, grouped));
+  marker.on("mouseout",  () => scheduleCarouselClose(`${token.lat.toFixed(4)},${token.lng.toFixed(4)}`));
+
   markersLayer.addLayer(marker);
   pinsByTokenId[token.tokenId] = marker;
 }
 
-// ── Toast notification ────────────────────────────────────────────────────────
-function showToast(message) {
-  const toast = document.createElement("div");
-  toast.className = "toast";
-  toast.textContent = message;
-  document.body.appendChild(toast);
-  requestAnimationFrame(() => toast.classList.add("toast-show"));
+// ── Carousel ──────────────────────────────────────────────────────────────────
+let carouselTimers = {};
+
+function carouselHTML(key, tokens, idx) {
+  const t    = tokens[idx];
+  const dots = tokens.map((_, j) => `<span class="c-dot${j === idx ? " c-dot--on" : ""}"></span>`).join("");
+  const avail = t.listed > 0
+    ? `<a class="c-collect" href="${t.objktUrl}" target="_blank" rel="noopener">Collect · ${t.price?.toFixed(2)} ꜩ</a>`
+    : t.soldOut
+    ? `<span class="c-sold">Sold out</span>`
+    : `<a class="c-collect c-collect--ghost" href="${t.objktUrl}" target="_blank" rel="noopener">View on objkt</a>`;
+  const tokenIdx = TOKENS.indexOf(t);
+  return `<div class="carousel-popup" data-key="${key}">
+    <div class="c-img-wrap">
+      <img class="c-img" src="${t.img}" alt="${t.name}">
+      ${tokens.length > 1 ? `
+        <button class="c-nav c-prev" onclick="carouselStep('${key}',-1)">‹</button>
+        <button class="c-nav c-next" onclick="carouselStep('${key}',1)">›</button>` : ""}
+    </div>
+    <div class="c-body">
+      <p class="c-title">${t.name}</p>
+      <p class="c-meta">${[t.date, t.loc].filter(Boolean).join(" · ")}</p>
+      ${avail}
+      <button class="c-open" onclick="openLightbox(${tokenIdx})">Open →</button>
+    </div>
+    ${tokens.length > 1 ? `<div class="c-dots">${dots}</div>` : ""}
+  </div>`;
+}
+
+function showCarousel(marker, tokens) {
+  const key = `${tokens[0].lat.toFixed(4)},${tokens[0].lng.toFixed(4)}`;
+  clearTimeout(carouselTimers[key + "_close"]);
+
+  let idx = activeCarousel[key]?.idx() ?? 0;
+  activeCarousel[key] = { marker, tokens, idx: () => idx, setIdx: i => { idx = i; } };
+
+  marker.unbindPopup();
+  marker.bindPopup(carouselHTML(key, tokens, idx), {
+    maxWidth: 220, minWidth: 200, className: "carousel-leaflet-popup", closeButton: false,
+  });
+  marker.openPopup();
+
+  clearInterval(carouselTimers[key]);
+  if (tokens.length > 1) {
+    carouselTimers[key] = setInterval(() => {
+      if (!marker.isPopupOpen()) { clearInterval(carouselTimers[key]); return; }
+      idx = (idx + 1) % tokens.length;
+      marker.getPopup()?.setContent(carouselHTML(key, tokens, idx));
+    }, 3000);
+  }
+
+  // Keep open when hovering popup
   setTimeout(() => {
-    toast.classList.remove("toast-show");
-    setTimeout(() => toast.remove(), 400);
-  }, 4000);
+    const el = marker.getPopup()?.getElement();
+    if (el) {
+      el.addEventListener("mouseenter", () => clearTimeout(carouselTimers[key + "_close"]));
+      el.addEventListener("mouseleave", () => scheduleCarouselClose(key));
+    }
+  }, 50);
+}
+
+window.carouselStep = function(key, dir) {
+  const state = activeCarousel[key];
+  if (!state) return;
+  clearInterval(carouselTimers[key]);
+  const newIdx = ((state.idx() + dir) + state.tokens.length) % state.tokens.length;
+  state.setIdx(newIdx);
+  state.marker.getPopup()?.setContent(carouselHTML(key, state.tokens, newIdx));
+};
+
+function scheduleCarouselClose(key) {
+  carouselTimers[key + "_close"] = setTimeout(() => {
+    activeCarousel[key]?.marker.closePopup();
+    clearInterval(carouselTimers[key]);
+    delete activeCarousel[key];
+  }, 300);
 }
 
 // ── Lightbox ──────────────────────────────────────────────────────────────────
@@ -127,7 +235,8 @@ function setupLightbox() {
   const lbSubtitle = document.getElementById("lb-subtitle");
   const lbDate     = document.getElementById("lb-date");
   const lbSupply   = document.getElementById("lb-supply");
-  const lbObjkt    = document.getElementById("lb-objkt");
+  const lbCollect  = document.getElementById("lb-collect");
+  const lbLocate   = document.getElementById("lb-locate");
 
   window.openLightbox = function(i) {
     currentIdx = i;
@@ -137,24 +246,70 @@ function setupLightbox() {
     lbTitle.textContent    = t.name;
     lbSubtitle.textContent = t.subtitle || "";
     lbDate.textContent     = [t.date, t.loc].filter(Boolean).join(" · ");
-    lbSupply.textContent   = t.supply
-      ? `Edition of ${t.supply} · ${t.holders} collector${t.holders !== 1 ? "s" : ""}` : "";
-    lbObjkt.href           = t.objktUrl;
+
+    if (t.supply === 1) {
+      lbSupply.textContent = t.soldOut ? "1 of 1 · Sold" : t.listed > 0 ? "1 of 1 · Available" : "1 of 1";
+    } else if (t.supply > 1) {
+      lbSupply.textContent = `${t.listed ?? "?"} of ${t.supply} editions left`;
+    } else {
+      lbSupply.textContent = "";
+    }
+
+    if (lbCollect) {
+      if (t.listed > 0) {
+        lbCollect.textContent = `Collect · ${t.price?.toFixed(2)} ꜩ`;
+        lbCollect.classList.remove("lb-btn--ghost");
+      } else {
+        lbCollect.textContent = t.soldOut ? "Sold out · objkt" : "View on objkt";
+        lbCollect.classList.add("lb-btn--ghost");
+      }
+      lbCollect.href = t.objktUrl;
+    }
+
+    if (lbLocate) {
+      if (t.lat && t.lng) {
+        lbLocate.style.display = "";
+        lbLocate.onclick = () => {
+          closeLightbox();
+          setTimeout(() => {
+            mapInstance.flyTo([t.lat, t.lng], 10, { duration: 1.2 });
+            const pin = pinsByTokenId[t.tokenId];
+            if (pin) showCarousel(pin, TOKENS.filter(x =>
+              x.lat?.toFixed(4) === t.lat.toFixed(4) && x.lng?.toFixed(4) === t.lng.toFixed(4)));
+            document.getElementById("map-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+          }, 350);
+        };
+      } else {
+        lbLocate.style.display = "none";
+      }
+    }
+
     lb.classList.add("open");
     document.body.style.overflow = "hidden";
   };
 
-  const close = () => { lb.classList.remove("open"); document.body.style.overflow = ""; };
-  const step  = d  => openLightbox((currentIdx + d + TOKENS.length) % TOKENS.length);
+  function closeLightbox() { lb.classList.remove("open"); document.body.style.overflow = ""; }
+  window.closeLightbox = closeLightbox;
 
-  document.getElementById("lb-close").addEventListener("click", close);
-  lb.addEventListener("click", e => { if (e.target === lb) close(); });
+  const step = d => openLightbox((currentIdx + d + TOKENS.length) % TOKENS.length);
+
+  document.getElementById("lb-close").addEventListener("click", closeLightbox);
+  lb.addEventListener("click", e => { if (e.target === lb) closeLightbox(); });
   document.getElementById("lb-prev").addEventListener("click", () => step(-1));
   document.getElementById("lb-next").addEventListener("click", () => step(1));
   document.addEventListener("keydown", e => {
     if (!lb.classList.contains("open")) return;
-    if (e.key === "Escape")     close();
+    if (e.key === "Escape")     closeLightbox();
     if (e.key === "ArrowLeft")  step(-1);
     if (e.key === "ArrowRight") step(1);
   });
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(message) {
+  const t = document.createElement("div");
+  t.className = "toast"; t.textContent = message;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => t.classList.add("toast-show"));
+  setTimeout(() => { t.classList.remove("toast-show"); setTimeout(() => t.remove(), 400); }, 4000);
 }
