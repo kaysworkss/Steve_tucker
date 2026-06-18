@@ -376,6 +376,7 @@ body {
 .street-link {
   display: inline-block;
   margin-top: 10px;
+  margin-right: 12px;
   font-family: var(--font-mono);
   font-size: 0.56rem;
   letter-spacing: 0.1em;
