@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tucker — A Life Drawn in Places</title>
+  <meta name="description" content="Field sketches by Tucker — ink drawings of places across America, collected on Tezos.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Instrument+Sans:wght@400;500;600&family=Martian+Mono:wght@300;400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="site-logo" href="#">Tucker <em>Sketchbook</em></a>
+    <nav>
+      <ul class="nav-links">
+        <li><a href="#map-section">Map</a></li>
+        <li><a href="#gallery-section">Gallery</a></li>
+        <li><a href="#collectors-section">Collectors</a></li>
+        <li><a href="https://objkt.com/tokens/KT1V35dHCUUpXT9ZUbCY58KbWJzkgEpeE5E9/19" target="_blank" rel="noopener">objkt ↗</a></li>
+      </ul>
+    </nav>
+    <button id="wallet-btn" aria-label="Connect Tezos wallet">Connect Wallet</button>
+  </header>
+
+  <section class="hero">
+    <div class="hero-left">
+      <p class="hero-kicker">Field Sketches · Tezos · Self-sustaining</p>
+      <h1 class="hero-h1">A life<br>drawn<br>in <em>places.</em></h1>
+      <p class="hero-body">
+        Tucker has spent decades stopping wherever the world looked interesting
+        and drawing it — in ink, on paper, in the moment. He writes the place
+        and date on every sketch. This site reads them.
+      </p>
+      <div class="hero-stats">
+        <span class="stat-num" id="sketch-count">—</span>
+        <span class="stat-label">sketches on-chain</span>
+      </div>
+    </div>
+    <div class="hero-right">
+      <img src="images/s5.jpg" alt="Twelvemile Beach campsite — Tucker 2012">
+    </div>
+  </section>
+
+  <section id="map-section">
+    <div class="section-head">
+      <p class="section-eyebrow">Where he drew</p>
+      <h2 class="section-h2">Every pin, a moment in ink</h2>
+      <p class="section-sub">Locations are read directly from the handwriting on each sketch. Pins appear as they're resolved.</p>
+    </div>
+    <div id="map" role="application" aria-label="Map of sketch locations"></div>
+  </section>
+
+  <section id="gallery-section">
+    <div class="section-head">
+      <p class="section-eyebrow">The drawings</p>
+      <h2 class="section-h2">All field sketches</h2>
+      <p class="section-sub">Loaded from the Tezos blockchain. Tucker mints, the site updates.</p>
+    </div>
+    <div id="my-collection">
+      <p class="my-col-head">Your Collection</p>
+      <p class="my-col-count" id="my-col-count">—</p>
+      <p class="my-col-sub" id="my-col-sub">Connect your wallet to see which sketches you hold.</p>
+    </div>
+    <div class="gallery-grid" id="gallery"></div>
+  </section>
+
+  <section id="collectors-section">
+    <div class="section-head">
+      <p class="section-eyebrow">On-chain</p>
+      <h2 class="section-h2">Collectors <span id="collectors-total"></span></h2>
+      <p class="section-sub">Every holder, read live from the Tezos blockchain.</p>
+    </div>
+    <div id="collectors-wrap">
+      <p class="loading-msg">Reading the blockchain…</p>
+    </div>
+  </section>
+
+  <div id="lightbox" class="lightbox" role="dialog" aria-modal="true">
+    <button class="lb-close" id="lb-close" aria-label="Close">✕</button>
+    <div class="lb-inner">
+      <img class="lb-img" id="lb-img" src="" alt="" tabindex="0">
+      <div class="lb-info">
+        <p class="lb-eyebrow">Tucker · Field Sketch</p>
+        <h2 class="lb-title" id="lb-title"></h2>
+        <p class="lb-subtitle" id="lb-subtitle"></p>
+        <p class="lb-date" id="lb-date"></p>
+        <p class="lb-supply" id="lb-supply"></p>
+        <a id="lb-objkt" class="lb-objkt-link" href="#" target="_blank" rel="noopener">View on objkt ↗</a>
+        <div class="lb-nav">
+          <button id="lb-prev">← Prev</button>
+          <button id="lb-next">Next →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span class="footer-sig">Tucker</span>
+    <span>Field sketches · 2009–ongoing</span>
+    <a href="https://objkt.com/tokens/KT1V35dHCUUpXT9ZUbCY58KbWJzkgEpeE5E9/19"
+       target="_blank" rel="noopener" style="color:inherit;text-decoration:none;">objkt ↗</a>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://unpkg.com/@airgap/beacon-dapp@4.2.0/dist/beacon-dapp.umd.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/chain.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/wallet.js"></script>
+</body>
+</html>
