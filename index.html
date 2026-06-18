@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Steve Tucker — A Life Drawn in Places</title>
   <meta name="description" content="Field sketches by Steve Tucker — ink drawings of places across America, collected on Tezos.">
+
+  <!-- Favicon — ink pen nib -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23f0ebe0'/><path d='M24 6 L26 10 L16 26 L14 22 Z' fill='%237c3317'/><path d='M14 22 L16 26 L13 27 Z' fill='%23452010'/><path d='M22 8 L24 6 L26 10 L24 12 Z' fill='%23a34522'/><line x1='20' y1='10' x2='15' y2='23' stroke='%23f0ebe0' stroke-width='1' opacity='0.4'/></svg>">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Sorts+Mill+Goudy:ital@0;1&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
@@ -16,16 +20,21 @@
   <!-- HEADER -->
   <header class="site-header">
     <a class="site-logo" href="#">Steve Tucker <em>Sketchbook</em></a>
-    <nav>
+    <nav id="main-nav">
       <ul class="nav-links">
         <li><a href="#about-section">Story</a></li>
         <li><a href="#map-section">Map</a></li>
         <li><a href="#gallery-section">Gallery</a></li>
         <li><a href="#collectors-section">Collectors</a></li>
-        <li><a href="https://https://objkt.com/users/tz1MNyWtbh2BLJZvRq68o4LCaHdRWjETjjwV/created" target="_blank" rel="noopener">objkt ↗</a></li>
+        <li><a href="https://objkt.com/users/tz1MNyWtbh2BLJZvRq68o4LCaHdRWjETjjwV/created" target="_blank" rel="noopener">objkt ↗</a></li>
       </ul>
     </nav>
-    <button id="wallet-btn" aria-label="Connect Tezos wallet">Connect Wallet</button>
+    <div class="header-right">
+      <button id="wallet-btn" aria-label="Connect Tezos wallet">Connect Wallet</button>
+      <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false" aria-controls="main-nav">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
   </header>
 
   <div class="wallet-modal" id="tezos-wallet-modal" role="dialog" aria-modal="true" aria-labelledby="tezos-wallet-title">
@@ -199,7 +208,7 @@
   <footer>
     <span class="footer-sig">Steve Tucker</span>
     <span>Field sketches · 2009–ongoing</span>
-    <a href="https://objkt.com/tokens/KT1V35dHCUUpXT9ZUbCY58KbWJzkgEpeE5E9/19"
+    <a href="https://objkt.com/users/tz1MNyWtbh2BLJZvRq68o4LCaHdRWjETjjwV/created"
        target="_blank" rel="noopener" style="color:inherit;text-decoration:none;">objkt ↗</a>
   </footer>
 
