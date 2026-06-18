@@ -514,17 +514,11 @@ async function renderCollectors() {
       const addr = b.account.address;
       if (addr === BURN_ADDRESS || MARKET_CONTRACTS.has(addr)) continue;
       if (!byAddr[addr]) byAddr[addr] = {
-        editions: 0,       // total editions held
-        works: {},         // tokenId → { name, qty }
+        tokenIds: new Set(),   // unique works
         name: ACCOUNT_NAMES[addr] || b.account.alias || "",
       };
       if (b.account.alias && !byAddr[addr].name) byAddr[addr].name = b.account.alias;
-      const qty = Number(b.balance);
-      byAddr[addr].editions += qty;
-      const tid  = b.token.tokenId;
-      const name = TOKENS.find(t => t.tokenId == tid)?.name || `#${tid}`;
-      if (!byAddr[addr].works[tid]) byAddr[addr].works[tid] = { name, qty: 0 };
-      byAddr[addr].works[tid].qty += qty;
+      byAddr[addr].tokenIds.add(b.token.tokenId);
     }
 
     await hydrateAccountNames(Object.keys(byAddr));
@@ -532,13 +526,10 @@ async function renderCollectors() {
       info.name = ACCOUNT_NAMES[addr] || info.name;
     }
 
-    // Sort by unique works count descending
-    const entries = Object.entries(byAddr).sort((a, b) => {
-      const wa = Object.keys(a[1].works).length;
-      const wb = Object.keys(b[1].works).length;
-      if (wb !== wa) return wb - wa;
-      return b[1].editions - a[1].editions; // tiebreak by total editions
-    });
+    // Sort by number of unique works descending
+    const entries = Object.entries(byAddr).sort((a, b) =>
+      b[1].tokenIds.size - a[1].tokenIds.size
+    );
 
     const totalEl = document.getElementById("collectors-total");
     if (totalEl) totalEl.textContent = `${entries.length} collector${entries.length !== 1 ? "s" : ""}`;
@@ -552,25 +543,23 @@ async function renderCollectors() {
       const short       = shortAddress(addr);
       const displayName = info.name || short;
       const addrLine    = info.name ? short : "";
-      const uniqueWorks = Object.keys(info.works).length;
-      const editionsStr = info.editions !== uniqueWorks
-        ? ` <span class="col-editions">(${info.editions} ed.)</span>` : "";
+      const uniqueCount = info.tokenIds.size;
 
-      // Works list — first two shown inline, rest collapsible
-      const workEntries = Object.values(info.works);
-      const rowId = `works-${addr.slice(-8)}`;
-      const firstTwo = workEntries.slice(0, 2).map(w =>
-        `<span class="work-pill">${w.name}${w.qty > 1 ? ` ×${w.qty}` : ""}</span>`
-      ).join("");
-      const rest = workEntries.slice(2).map(w =>
-        `<span class="work-pill">${w.name}${w.qty > 1 ? ` ×${w.qty}` : ""}</span>`
-      ).join("");
-      const moreBtn = rest
+      // Resolve token names
+      const workNames = [...info.tokenIds].map(tid =>
+        TOKENS.find(t => t.tokenId == tid)?.name || `#${tid}`
+      );
+
+      // First two always visible; rest toggle open
+      const rowId   = `works-${addr.slice(-8)}`;
+      const visible = workNames.slice(0, 2).map(n =>
+        `<span class="work-pill">${n}</span>`).join("");
+      const hidden  = workNames.slice(2).map(n =>
+        `<span class="work-pill">${n}</span>`).join("");
+      const toggle  = hidden
         ? `<button class="works-toggle" aria-expanded="false" aria-controls="${rowId}"
-              onclick="toggleWorks(this,'${rowId}')">+${workEntries.length - 2} more</button>`
-        : "";
-      const hiddenWorks = rest
-        ? `<span class="works-extra" id="${rowId}" hidden>${rest}</span>` : "";
+              onclick="toggleWorks(this,'${rowId}')">+${workNames.length - 2} more</button>
+           <span class="works-extra" id="${rowId}" hidden>${hidden}</span>` : "";
 
       return `<tr class="collector-row" data-addr="${addr}">
         <td class="col-rank">${i + 1}</td>
@@ -584,13 +573,9 @@ async function renderCollectors() {
             <a href="https://objkt.com/profile/${addr}/collected" target="_blank" rel="noopener">objkt ↗</a>
           </span>
         </td>
-        <td class="col-count">
-          <span class="collector-count">${uniqueWorks}</span>${editionsStr}
-        </td>
+        <td class="col-count"><span class="collector-count">${uniqueCount}</span></td>
         <td class="col-works">
-          <div class="works-list">
-            ${firstTwo}${moreBtn}${hiddenWorks}
-          </div>
+          <div class="works-list">${visible}${toggle}</div>
         </td>
       </tr>`;
     }).join("");
@@ -598,10 +583,7 @@ async function renderCollectors() {
     wrap.innerHTML = `
       <table class="collectors-table">
         <thead><tr>
-          <th>#</th>
-          <th>Collector</th>
-          <th title="Unique works · total editions">Works</th>
-          <th>Titles</th>
+          <th>#</th><th>Collector</th><th>Works</th><th>Titles</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
