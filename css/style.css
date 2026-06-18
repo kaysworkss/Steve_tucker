@@ -985,10 +985,26 @@ footer {
   :root { --header-h: 52px; }
 
   /* Header */
-  .site-header { padding: 0 16px; }
-  .site-logo { flex: 1 1 auto; font-size: 0.88rem; }
-  #wallet-btn { padding: 6px 10px; font-size: 0.55rem; }
-  .header-right { gap: 8px; }
+  .site-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 0 14px;
+    gap: 8px;
+  }
+  .site-logo {
+    display: block;
+    width: 100%;
+    font-size: 0.86rem;
+    line-height: var(--header-h);
+  }
+  .site-logo em { display: none; }
+  #wallet-btn {
+    width: 104px;
+    padding: 6px 8px;
+    font-size: 0.5rem;
+    letter-spacing: 0.055em;
+  }
+  .header-right { gap: 8px; justify-self: end; min-width: 148px; }
 
   /* Hamburger */
   .nav-hamburger { display: flex; }
