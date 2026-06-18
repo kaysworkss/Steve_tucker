@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -62,7 +62,7 @@
       <div class="hero-stats">
         <div class="hero-stat">
           <span class="stat-num" id="sketch-count">—</span>
-          <span class="stat-label">Unique works</span>
+          <span class="stat-label">Sketches on-chain</span>
         </div>
         <div class="hero-stat">
           <span class="stat-num">83</span>
@@ -92,7 +92,7 @@
       </figure>
       <div class="about-text">
         <p class="about-body">
-          Steve Tucker is 83. He's spent a lifetime stopping wherever the world
+          Steve Tucker is 83 years old. He's spent a lifetime stopping wherever the world
           looked interesting and drawing it — in ink, on paper, right there.
           He taught art in Terre Haute his whole life, made courtroom sketches,
           and has been recording the world around him for decades.
@@ -137,9 +137,9 @@
     <div class="section-head">
       <p class="section-eyebrow">Where he drew</p>
       <h2 class="section-h2">Every pin, a moment in ink</h2>
-      <p class="section-sub">Tap a pin to see the sketch, then open the full artwork.</p>
+      <p class="section-sub">Hover a pin to see the sketch. Click to open.</p>
     </div>
-    <div class="map-mobile-note">Drag with one finger. Tap a pin for the sketch.</div>
+    <p class="map-mobile-note">Tap a pin to see the sketch.</p>
     <div id="map" role="application" aria-label="Map of sketch locations"></div>
   </section>
 
@@ -193,17 +193,6 @@
     </div>
   </div>
 
-  <!-- COLLECTOR THANK YOU -->
-  <div id="collector-thanks" class="collector-thanks" role="dialog" aria-modal="true" aria-labelledby="collector-thanks-title">
-    <div class="collector-thanks-card">
-      <button class="collector-thanks-close" id="collector-thanks-close" aria-label="Close">✕</button>
-      <p class="collector-thanks-eyebrow">Collector recognized</p>
-      <h2 id="collector-thanks-title">Thanks for being part of this.</h2>
-      <p id="collector-thanks-body">You hold a Steve Tucker sketch. It means one of these places has found a home with you.</p>
-      <button class="collector-thanks-action" id="collector-thanks-action">View my sketches</button>
-    </div>
-  </div>
-
   <!-- FOOTER -->
   <footer>
     <span class="footer-sig">Steve Tucker</span>
@@ -214,14 +203,10 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://unpkg.com/@airgap/beacon-dapp@4.2.0/dist/beacon-dapp.umd.js"></script>
   <script src="js/data.js"></script>
   <script src="js/chain.js"></script>
   <script src="js/app.js"></script>
   <script src="js/wallet.js"></script>
-
-  <!-- Keep the local tweet card visible so this section stays compact. -->
-  <script>
-    document.getElementById("tweet-embed")?.remove();
-  </script>
 </body>
 </html>
