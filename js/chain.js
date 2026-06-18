@@ -32,6 +32,39 @@ function dateFromDescription(description = "") {
     || "";
 }
 
+function locFromDescription(description = "") {
+  if (!description.trim()) return "";
+
+  // Split on blank line (the separator Steve uses between place and date)
+  const parts = description.split(/\n\n+/).map(s => s.trim()).filter(Boolean);
+
+  // If there's more than one part, everything before the last part is location
+  if (parts.length >= 2) {
+    const loc = parts.slice(0, -1)
+      .join(", ")
+      .replace(/\n+/g, ", ") // normalize any single newlines within the loc
+      .trim();
+    // Make sure we're not returning a date string as the location
+    if (!dateFromDescription(loc) || loc.length > 20) return loc;
+  }
+
+  // Single part — check if it's just a date; if so, no location
+  const single = parts[0]?.replace(/\n+/g, ", ").trim() || "";
+  if (dateFromDescription(single) && single.length < 30) return "";
+
+  // Single part that's not a date: treat as location
+  return single;
+}
+
+// Returns true when a name/description refers to a context that has no fixed
+// geographic pin — e.g. a cruise ship, plane, or open ocean.
+// These tokens still show in the gallery with their description, just no map pin.
+const NO_PIN_PATTERNS = /\b(cruise|cruise\s*ship|ship|vessel|ocean\s*liner|ms\s+\w+|mv\s+\w+|ss\s+\w+|rms\s+\w+|at\s+sea|open\s+ocean|international\s+waters)\b/i;
+
+function isNoPin(name = "", description = "") {
+  return NO_PIN_PATTERNS.test(name) || NO_PIN_PATTERNS.test(description);
+}
+
 function shortAddress(address) {
   return address ? address.slice(0, 7) + "…" + address.slice(-5) : "";
 }
@@ -221,6 +254,8 @@ async function loadAllTokens() {
 
     // Check cache
     const cached = cache[t.tokenId];
+    const descLoc = locFromDescription(meta.description);
+    const neverPin = isNoPin(name, meta.description || "");
 
     return {
       tokenId:  t.tokenId,
@@ -240,14 +275,18 @@ async function loadAllTokens() {
       streetView: !!known?.streetView,
       placePhotos: !!known?.placePhotos,
       photoQuery: known?.photoQuery || known?.loc || "",
+      // noPin: true means the subject has no fixed location (cruise, open ocean, etc.)
+      // The card still renders fully — just no map pin is ever placed.
+      noPin: neverPin,
       // From chain attributes (if Tucker adds them later)
-      lat:      isNaN(latAttr) ? known?.lat ?? null : latAttr,
-      lng:      isNaN(lngAttr) ? known?.lng ?? null : lngAttr,
-      // From cache (previously extracted by vision)
-      loc:      cached?.loc  || attr(meta, "location") || known?.loc || "",
+      lat:      neverPin ? null : (isNaN(latAttr) ? known?.lat ?? null : latAttr),
+      lng:      neverPin ? null : (isNaN(lngAttr) ? known?.lng ?? null : lngAttr),
+      // loc: best available description of where the sketch was made
+      loc:      cached?.loc  || attr(meta, "location") || known?.loc || descLoc || "",
       date:     cached?.date || attr(meta, "date") || known?.date || dateFromDescription(meta.description),
-      // Will be filled by vision + geocoding
-      _needsExtraction: !cached && isNaN(latAttr) && !known,
+      // needs vision only when: no cache, no known entry, no on-chain location attr,
+      // no description-parsed loc, AND not a known no-pin subject
+      _needsExtraction: !neverPin && !cached && isNaN(latAttr) && !known && !attr(meta, "location") && !descLoc,
     };
   });
 
@@ -388,18 +427,53 @@ async function fetchAvailability() {
 }
 
 async function applyCoords(onTokenReady) {
-  TOKENS.filter(t => t.lat && t.lng).forEach(t => onTokenReady?.(t));
+  // Pass 1 — tokens that already have coords (from KNOWN_TOKEN_DETAILS or cache)
+  TOKENS.filter(t => !t.noPin && t.lat && t.lng).forEach(t => onTokenReady?.(t));
 
   if (TOKENS.some(t => t._isFallback)) return;
 
-  const needsCoords = TOKENS.filter(t => !t.lat && !t.lng && (t.loc || t.name));
-  for (const token of needsCoords) {
-    const coords = await geocode(token.loc || token.name);
-    if (!coords) continue;
-    token.lat = coords.lat;
-    token.lng = coords.lng;
-    onTokenReady?.(token);
+  // Pass 2 — tokens with a loc string but no coords yet: geocode the loc
+  const needsGeocode = TOKENS.filter(t => !t.noPin && !t.lat && !t.lng && t.loc);
+  for (const token of needsGeocode) {
+    const coords = await geocode(token.loc);
+    if (coords) {
+      token.lat = coords.lat;
+      token.lng = coords.lng;
+      const cache = loadCache();
+      cache[token.tokenId] = { ...cache[token.tokenId], lat: coords.lat, lng: coords.lng };
+      saveCache(cache);
+      onTokenReady?.(token);
+    }
+    await new Promise(r => setTimeout(r, 300));
   }
+
+  // Pass 3 — tokens with no loc but a meaningful name: try geocoding the name.
+  const needsNameGeocode = TOKENS.filter(t =>
+    !t.noPin && !t.lat && !t.lng && !t.loc &&
+    t.name && !t.name.startsWith("Token #") && !t._needsExtraction
+  );
+  for (const token of needsNameGeocode) {
+    const looksLikePlace = /,|beach|lake|park|river|canyon|mountain|island|falls|bay|cove|trail|camp|pueblo|ranch|gorge/i.test(token.name);
+    if (!looksLikePlace) continue;
+    const coords = await geocode(token.name);
+    if (coords) {
+      token.lat = coords.lat;
+      token.lng = coords.lng;
+      token.loc = token.loc || token.name;
+      const cache = loadCache();
+      cache[token.tokenId] = { ...cache[token.tokenId], lat: coords.lat, lng: coords.lng, loc: token.loc };
+      saveCache(cache);
+      onTokenReady?.(token);
+    }
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  // Pass 4 — tokens with no loc, no coords, and no description: use vision
+  const needsVision = TOKENS.filter(t => !t.noPin && !t.lat && !t.lng && !t.loc && t.ipfsImg && t._needsExtraction);
+  if (!needsVision.length) return;
+  await enrichTokensWithVision(token => {
+    onTokenReady?.(token);
+  });
 }
 
 function startLiveUpdates() {

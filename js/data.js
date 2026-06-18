@@ -55,6 +55,18 @@ const KNOWN_TOKEN_DETAILS = [
   { match: "wind-blown tree", loc: "Kealia Beach, Kauai, HI", lat: 22.0979, lng: -159.3073, streetView: true, placePhotos: true },
   { match: "taos pueblo", loc: "Taos Pueblo, New Mexico", lat: 36.4386, lng: -105.5444, placePhotos: true },
   { match: "quiet creek", loc: "Taos Pueblo, New Mexico", lat: 36.4386, lng: -105.5444, placePhotos: true },
+
+  // ── No fixed location — cruise ships, vessels, open ocean ─────────────────
+  // noPin is set automatically by isNoPin() for any token matching cruise/ship.
+  // Add named vessels here so placePhotos links point to the right ship images.
+  { match: "carnival",   noPin: true, loc: "At sea — Carnival Cruise",  placePhotos: true, photoQuery: "Carnival cruise ship" },
+  { match: "royal caribbean", noPin: true, loc: "At sea — Royal Caribbean", placePhotos: true, photoQuery: "Royal Caribbean cruise ship" },
+  { match: "norwegian",  noPin: true, loc: "At sea — Norwegian Cruise", placePhotos: true, photoQuery: "Norwegian cruise ship" },
+  { match: "celebrity",  noPin: true, loc: "At sea — Celebrity Cruises", placePhotos: true, photoQuery: "Celebrity cruise ship" },
+  { match: "princess cruise", noPin: true, loc: "At sea — Princess Cruises", placePhotos: true, photoQuery: "Princess cruise ship" },
+  { match: "cruise ship", noPin: true, loc: "At sea",                   placePhotos: true, photoQuery: "cruise ship at sea" },
+  { match: "on the ship", noPin: true, loc: "At sea",                   placePhotos: true, photoQuery: "cruise ship at sea" },
+  { match: "aboard",      noPin: true, loc: "At sea",                   placePhotos: true, photoQuery: "cruise ship at sea" },
 ];
 
 // Runtime — populated by chain.js on every page load

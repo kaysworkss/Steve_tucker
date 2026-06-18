@@ -37,7 +37,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   await fetchAvailability();
-  DISPLAY_TOKENS = uniqueArtworkTokens(TOKENS);
+  DISPLAY_TOKENS = sortTokensForDisplay(uniqueArtworkTokens(TOKENS));
 
   if (counter) counter.textContent = DISPLAY_TOKENS.length;
   grid.innerHTML = "";
@@ -95,6 +95,28 @@ function artworkRank(token) {
   if (token.availabilityKind === "open" || token.availabilityKind === "auction") score += 20;
   if ((token.collectors || []).length) score += 10;
   return score;
+}
+
+// Sort so live auctions + open editions rise to the top,
+// then collected works, then unlisted / artist-held.
+function sortTokensForDisplay(tokens) {
+  const PRIORITY = {
+    auction: 0,   // live on auction — highest
+    open:    1,   // editions still available
+    artist:  2,   // held by artist, not yet listed
+    sold:    3,   // all collected
+    burned:  4,   // burned
+    "":      5,   // unknown / loading
+  };
+  return [...tokens].sort((a, b) => {
+    const pa = PRIORITY[a.availabilityKind] ?? 5;
+    const pb = PRIORITY[b.availabilityKind] ?? 5;
+    if (pa !== pb) return pa - pb;
+    // Within same tier, more editions left → higher
+    const la = a.listed ?? 0;
+    const lb = b.listed ?? 0;
+    return lb - la;
+  });
 }
 
 // ── Availability ──────────────────────────────────────────────────────────────
