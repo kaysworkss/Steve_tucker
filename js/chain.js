@@ -1,4 +1,4 @@
-﻿// ─── CHAIN.JS — reads everything from Tezos via TzKT + Claude vision ─────────
+// ─── CHAIN.JS — reads everything from Tezos via TzKT + Claude vision ─────────
 // No hardcoded coords. Location is extracted from the sketch image itself.
 
 const TZKT     = "https://api.tzkt.io/v1";
