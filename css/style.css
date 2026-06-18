@@ -33,7 +33,7 @@ body {
 
 /* ─── HEADER ──────────────────────────────────────────────────────────────── */
 .site-header {
-  position: sticky; top: 0; z-index: 200;
+  position: sticky; top: 0; z-index: 2000;
   background: var(--paper);
   border-bottom: 1px solid var(--line-strong);
   padding: 0 5vw;
@@ -49,7 +49,9 @@ body {
   color: var(--ink);
   text-decoration: none;
   white-space: nowrap;
-  flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .site-logo em { font-style: italic; color: var(--rust); }
 
@@ -904,6 +906,7 @@ footer {
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 /* ── Hamburger button — hidden on desktop ── */
@@ -983,8 +986,9 @@ footer {
 
   /* Header */
   .site-header { padding: 0 16px; }
-  .site-logo { font-size: 0.88rem; }
+  .site-logo { flex: 1 1 auto; font-size: 0.88rem; }
   #wallet-btn { padding: 6px 10px; font-size: 0.55rem; }
+  .header-right { gap: 8px; }
 
   /* Hamburger */
   .nav-hamburger { display: flex; }
@@ -996,7 +1000,7 @@ footer {
     left: 0; right: 0;
     background: var(--paper);
     border-bottom: 1px solid var(--line-strong);
-    z-index: 199;
+    z-index: 1999;
     transform: translateY(-110%);
     transition: transform 0.25s ease;
     pointer-events: none;
