@@ -393,9 +393,12 @@ body {
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid var(--line);
-  font-size: 0.76rem;
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
   line-height: 1.45;
-  color: var(--ink-2);
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
 .street-link {
   display: inline-block;
