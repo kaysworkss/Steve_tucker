@@ -4,6 +4,7 @@
 const TZKT     = "https://api.tzkt.io/v1";
 const IPFS_GW  = "https://ipfs.io/ipfs/";
 const IPFS_GW2 = "https://cloudflare-ipfs.com/ipfs/"; // fallback gateway
+const OBJKT_GQL = "https://data.objkt.com/v3/graphql";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -35,6 +36,54 @@ function dateFromDescription(description = "") {
   return description.match(/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},\s+\d{4}\b/i)?.[0]
     || description.match(/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/)?.[0]
     || "";
+}
+
+function shortAddress(address) {
+  return address ? address.slice(0, 7) + "…" + address.slice(-5) : "";
+}
+
+function accountDisplayName(accountOrAddress) {
+  const address = typeof accountOrAddress === "string" ? accountOrAddress : accountOrAddress?.address;
+  if (!address) return "";
+  return ACCOUNT_NAMES[address]
+    || (typeof accountOrAddress === "object" ? accountOrAddress.alias : "")
+    || shortAddress(address);
+}
+
+async function hydrateAccountNames(addresses) {
+  const missing = [...new Set(addresses)]
+    .filter(Boolean)
+    .filter(addr => !ACCOUNT_NAMES[addr] && !MARKET_CONTRACTS.has(addr) && addr !== BURN_ADDRESS);
+
+  if (!missing.length) return ACCOUNT_NAMES;
+
+  try {
+    const res = await fetch(OBJKT_GQL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: `query HolderNames($addresses:[String!]) {
+          holder(where:{address:{_in:$addresses}}) {
+            address
+            alias
+            tzdomain
+            twitter
+          }
+        }`,
+        variables: { addresses: missing },
+      }),
+    });
+    if (!res.ok) throw new Error("objkt profiles " + res.status);
+    const data = await res.json();
+    for (const holder of data.data?.holder || []) {
+      const name = holder.alias || holder.tzdomain || holder.twitter?.replace(/^https?:\/\/(www\.)?(x|twitter)\.com\//, "@");
+      if (name) ACCOUNT_NAMES[holder.address] = name;
+    }
+  } catch (err) {
+    console.warn("objkt profile lookup failed:", err);
+  }
+
+  return ACCOUNT_NAMES;
 }
 
 // ── GEOCODING — place name → lat/lng via Nominatim (free, no key) ─────────────
@@ -289,6 +338,10 @@ async function fetchAvailability() {
     console.warn("Availability lookup failed:", err);
   }
 
+  await hydrateAccountNames(Object.values(byTokenId)
+    .flat()
+    .map(b => b.account.address));
+
   TOKENS.forEach(t => {
     const balances = byTokenId[String(t.tokenId)] || [];
     const creatorBalance = balances
@@ -300,8 +353,18 @@ async function fetchAvailability() {
     const burnBalance = balances
       .filter(b => b.account.address === BURN_ADDRESS)
       .reduce((sum, b) => sum + Number(b.balance || 0), 0);
+    const collectorEntries = balances
+      .filter(b => b.account.address !== (t.creator || CREATOR_ADDRESS))
+      .filter(b => b.account.address !== BURN_ADDRESS)
+      .filter(b => !MARKET_CONTRACTS.has(b.account.address))
+      .map(b => ({
+        address: b.account.address,
+        name: accountDisplayName(b.account),
+        count: Number(b.balance || 0),
+      }));
 
     t.price = null;
+    t.collectors = collectorEntries;
     if (t.supply > 1) {
       t.listed = creatorBalance;
       t.soldOut = creatorBalance === 0;
@@ -387,6 +450,11 @@ async function renderCollectors() {
       byAddr[addr].tokenIds.push(b.token.tokenId);
     }
 
+    await hydrateAccountNames(Object.keys(byAddr));
+    for (const [addr, info] of Object.entries(byAddr)) {
+      info.name = ACCOUNT_NAMES[addr] || info.name;
+    }
+
     const entries = Object.entries(byAddr).sort((a, b) => b[1].total - a[1].total);
     const totalEl = document.getElementById("collectors-total");
     if (totalEl) totalEl.textContent = `${entries.length} collector${entries.length !== 1 ? "s" : ""}`;
@@ -397,7 +465,7 @@ async function renderCollectors() {
     }
 
     const rows = entries.map(([addr, info], i) => {
-      const short = addr.slice(0, 7) + "…" + addr.slice(-5);
+      const short = shortAddress(addr);
       const displayName = info.name || short;
       const addrLine = info.name ? short : "";
       const works = info.tokenIds

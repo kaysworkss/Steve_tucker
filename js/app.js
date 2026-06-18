@@ -66,9 +66,20 @@ function availabilityBadge(token) {
   return `<span class="avail-badge avail-unlisted">${text}</span>`;
 }
 
+function collectorLine(token) {
+  const collectors = token.collectors || [];
+  if (!collectors.length) return "";
+  const names = collectors.map(c => c.name).filter(Boolean);
+  const shown = names.slice(0, 3).join(", ");
+  const extra = names.length > 3 ? ` +${names.length - 3}` : "";
+  return `<p class="card-collectors">Collected by ${shown}${extra}</p>`;
+}
+
 function updateCardAvailability(card, token) {
   const existing = card.querySelector(".card-avail");
   if (existing) existing.remove();
+  const existingCollectors = card.querySelector(".card-collectors");
+  if (existingCollectors) existingCollectors.remove();
   if (token.listed === null) return;
 
   const div = document.createElement("div");
@@ -89,7 +100,9 @@ function updateCardAvailability(card, token) {
     div.innerHTML = badge;
   }
 
-  card.querySelector(".card-body").appendChild(div);
+  const body = card.querySelector(".card-body");
+  body.appendChild(div);
+  body.insertAdjacentHTML("beforeend", collectorLine(token));
 }
 // ── Gallery card ──────────────────────────────────────────────────────────────
 function addCard(token, i) {
