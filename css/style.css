@@ -1,0 +1,776 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Instrument+Sans:wght@400;500;600&family=Martian+Mono:wght@300;400&display=swap');
+
+/* ─── TOKENS ─── */
+:root {
+  --paper:      #f0ebe0;
+  --paper-2:    #e8e1d0;
+  --paper-3:    #ddd5c0;
+  --ink:        #16120c;
+  --ink-2:      #3a3228;
+  --ink-3:      #7a6e5a;
+  --rust:       #7c3317;
+  --rust-light: #a34522;
+  --sage:       #4a6650;
+  --line:       rgba(22,18,12,0.14);
+  --line-strong:rgba(22,18,12,0.30);
+
+  --font-display: 'DM Serif Display', Georgia, serif;
+  --font-body:    'Instrument Sans', system-ui, sans-serif;
+  --font-mono:    'Martian Mono', 'Courier New', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; font-size: 16px; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 400;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── RULED PAPER TEXTURE ─── */
+.ruled {
+  background-image: repeating-linear-gradient(
+    180deg,
+    transparent 0px,
+    transparent 29px,
+    var(--line) 29px,
+    var(--line) 30px
+  );
+}
+
+/* ─── HEADER / NAV ─── */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line-strong);
+  padding: 0 6vw;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+}
+
+.site-logo {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  color: var(--ink);
+  text-decoration: none;
+  letter-spacing: 0.01em;
+}
+
+.site-logo em {
+  font-style: italic;
+  color: var(--rust);
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  list-style: none;
+}
+
+.nav-links a {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.nav-links a:hover { color: var(--ink); }
+
+/* ─── WALLET BUTTON ─── */
+#wallet-btn {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: none;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-2);
+  padding: 7px 16px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+#wallet-btn:hover {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+#wallet-btn.connected {
+  border-color: var(--sage);
+  color: var(--sage);
+}
+
+/* ─── HERO ─── */
+.hero {
+  min-height: 92vh;
+  padding: 10vh 6vw 8vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  align-items: end;
+  border-bottom: 1px solid var(--line-strong);
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    180deg, transparent 0px, transparent 29px,
+    var(--line) 29px, var(--line) 30px
+  );
+  pointer-events: none;
+}
+
+.hero-left { padding-bottom: 4vh; }
+
+.hero-kicker {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--rust);
+  margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.hero-kicker::before {
+  content: '';
+  width: 32px;
+  height: 1px;
+  background: var(--rust);
+}
+
+.hero-h1 {
+  font-family: var(--font-display);
+  font-size: clamp(3.5rem, 7vw, 6.5rem);
+  font-weight: 400;
+  line-height: 1.0;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin-bottom: 36px;
+}
+
+.hero-h1 em {
+  font-style: italic;
+  color: var(--rust);
+}
+
+.hero-body {
+  font-size: 1rem;
+  line-height: 1.75;
+  color: var(--ink-2);
+  max-width: 46ch;
+  margin-bottom: 48px;
+}
+
+.hero-stats {
+  display: flex;
+  gap: 36px;
+  padding-top: 32px;
+  border-top: 1px solid var(--line-strong);
+}
+
+.stat-num {
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  line-height: 1;
+  color: var(--ink);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* Hero right — large sketch */
+.hero-right {
+  position: relative;
+  align-self: stretch;
+  border-left: 1px solid var(--line-strong);
+  overflow: hidden;
+}
+
+.hero-right img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  opacity: 0.88;
+  mix-blend-mode: multiply;
+}
+
+/* ─── SECTION HEADERS ─── */
+.section-head {
+  padding: 64px 6vw 0;
+}
+
+.section-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--rust);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.section-eyebrow::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line-strong);
+}
+
+.section-h2 {
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  margin-bottom: 8px;
+}
+
+.section-sub {
+  font-size: 0.9rem;
+  color: var(--ink-3);
+  max-width: 55ch;
+  margin-bottom: 40px;
+}
+
+/* ─── MAP ─── */
+#map-section {
+  border-bottom: 1px solid var(--line-strong);
+  padding-bottom: 0;
+}
+
+#map {
+  margin-top: 40px;
+  width: 100%;
+  height: 480px;
+  border-top: 1px solid var(--line-strong);
+  filter: sepia(20%) contrast(0.9) brightness(1.04) saturate(0.8);
+}
+
+/* ─── GALLERY ─── */
+#gallery-section {
+  padding-bottom: 80px;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1px;
+  background: var(--line-strong);
+  border: 1px solid var(--line-strong);
+  margin: 0 6vw;
+}
+
+.sketch-card {
+  background: var(--paper);
+  cursor: pointer;
+  transition: background 0.15s;
+  position: relative;
+}
+
+.sketch-card:hover { background: var(--paper-2); }
+
+.sketch-card:focus-visible {
+  outline: 2px solid var(--rust);
+  outline-offset: -2px;
+}
+
+.card-img {
+  width: 100%;
+  aspect-ratio: 3/4;
+  object-fit: cover;
+  display: block;
+  border-bottom: 1px solid var(--line);
+}
+
+.card-body {
+  padding: 16px 18px 20px;
+}
+
+.card-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 400;
+  margin-bottom: 4px;
+  color: var(--ink);
+}
+
+.card-loc {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 3px;
+}
+
+.card-date {
+  font-size: 0.82rem;
+  color: var(--ink-3);
+  font-style: italic;
+}
+
+/* Collector badge */
+.card-owned {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: var(--sage);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+}
+
+/* ─── LIGHTBOX ─── */
+.lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(14,11,8,0.96);
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.lightbox.open { display: flex; }
+
+.lb-inner {
+  display: flex;
+  gap: 48px;
+  align-items: flex-start;
+  max-width: 1000px;
+  width: 100%;
+}
+
+.lb-img {
+  flex: 0 0 auto;
+  max-width: 52%;
+  max-height: 82vh;
+  object-fit: contain;
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+.lb-info {
+  flex: 1;
+  color: var(--paper);
+  padding-top: 4px;
+}
+
+.lb-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--rust-light);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lb-eyebrow::before { content: ''; width: 24px; height: 1px; background: var(--rust-light); }
+
+.lb-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  font-weight: 400;
+  line-height: 1.1;
+  margin-bottom: 10px;
+}
+
+.lb-subtitle {
+  font-size: 0.9rem;
+  color: rgba(240,235,224,0.55);
+  font-style: italic;
+  margin-bottom: 6px;
+}
+
+.lb-date {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  color: rgba(240,235,224,0.35);
+  margin-bottom: 36px;
+}
+
+.lb-objkt-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--paper);
+  text-decoration: none;
+  border: 1px solid rgba(255,255,255,0.2);
+  padding: 9px 18px;
+  margin-bottom: 32px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.lb-objkt-link:hover {
+  border-color: rgba(255,255,255,0.6);
+  background: rgba(255,255,255,0.05);
+}
+
+.lb-nav {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.lb-nav button {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  padding: 9px 20px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.lb-nav button:hover {
+  border-color: rgba(255,255,255,0.6);
+  background: rgba(255,255,255,0.05);
+}
+
+.lb-close {
+  position: fixed;
+  top: 20px;
+  right: 28px;
+  background: none;
+  border: none;
+  color: rgba(240,235,224,0.5);
+  font-size: 1.4rem;
+  cursor: pointer;
+  transition: color 0.15s;
+  font-family: var(--font-mono);
+  line-height: 1;
+}
+
+.lb-close:hover { color: var(--paper); }
+
+/* ─── COLLECTORS ─── */
+#collectors-section {
+  padding-bottom: 80px;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.collectors-table {
+  margin: 0 6vw;
+  border: 1px solid var(--line-strong);
+  border-collapse: collapse;
+  width: calc(100% - 12vw);
+  font-size: 0.88rem;
+}
+
+.collectors-table th {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  text-align: left;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--paper-2);
+}
+
+.collectors-table td {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.collectors-table tr:last-child td { border-bottom: none; }
+
+.collectors-table tr:hover td { background: var(--paper-2); }
+
+.collector-addr {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-2);
+  letter-spacing: 0.02em;
+}
+
+.collector-count {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--rust);
+}
+
+/* Highlight the connected wallet's row */
+.collector-row.is-me td { background: rgba(74,102,80,0.08); }
+.collector-row.is-me .collector-addr { color: var(--sage); }
+
+.collector-links {
+  display: inline-flex;
+  gap: 10px;
+  margin-left: 10px;
+}
+
+.collector-links a {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.collector-links a:hover { color: var(--rust); }
+
+/* Lightbox edition info */
+.lb-supply {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  color: rgba(240,235,224,0.35);
+  margin-bottom: 24px;
+}
+
+.collectors-empty {
+  margin: 0 6vw;
+  padding: 48px 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-3);
+  letter-spacing: 0.06em;
+  text-align: center;
+  border: 1px solid var(--line-strong);
+}
+
+.loading-msg {
+  margin: 0 6vw;
+  padding: 32px 20px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+  border: 1px solid var(--line-strong);
+}
+
+/* ─── YOUR COLLECTION ─── */
+#my-collection {
+  display: none;
+  margin: 0 6vw;
+  padding: 24px;
+  border: 1px solid var(--sage);
+  background: rgba(74,102,80,0.06);
+  margin-bottom: 32px;
+}
+
+#my-collection.visible { display: block; }
+
+.my-col-head {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--sage);
+  margin-bottom: 12px;
+}
+
+.my-col-count {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.my-col-sub { font-size: 0.85rem; color: var(--ink-3); }
+
+/* ─── FOOTER ─── */
+footer {
+  padding: 40px 6vw;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+
+.footer-sig {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.2rem;
+  color: var(--ink);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 768px) {
+  .hero { grid-template-columns: 1fr; }
+  .hero-right { display: none; }
+  .lb-inner { flex-direction: column; }
+  .lb-img { max-width: 100%; max-height: 45vh; }
+  .nav-links { display: none; }
+  .hero-stats { gap: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+
+/* ─── MINTING GUIDE ── */
+#mint-section {
+  padding-bottom: 80px;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.mint-guide {
+  margin: 0 6vw;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--line-strong);
+}
+
+.mint-step {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+  padding: 32px 36px;
+  border-bottom: 1px solid var(--line);
+}
+
+.mint-step:last-child { border-bottom: none; }
+
+.mint-num {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  color: var(--line-strong);
+  flex-shrink: 0;
+  width: 48px;
+  line-height: 1;
+  padding-top: 2px;
+}
+
+.mint-step-title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 400;
+  margin-bottom: 8px;
+  color: var(--ink);
+}
+
+.mint-step-body {
+  font-size: 0.88rem;
+  color: var(--ink-2);
+  line-height: 1.65;
+  max-width: 55ch;
+  margin-bottom: 16px;
+}
+
+.mint-code {
+  background: var(--paper-2);
+  border: 1px solid var(--line-strong);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mint-field {
+  display: flex;
+  gap: 16px;
+  align-items: baseline;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+
+.mf-key {
+  color: var(--rust);
+  min-width: 72px;
+  letter-spacing: 0.06em;
+}
+
+.mf-val {
+  color: var(--ink-2);
+  letter-spacing: 0.02em;
+}
+
+/* Card img wrap */
+.card-img-wrap {
+  aspect-ratio: 3/4;
+  overflow: hidden;
+  background: var(--paper-2);
+  border-bottom: 1px solid var(--line);
+}
+
+/* Collectors total badge */
+#collectors-total {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-3);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  margin-left: 12px;
+  vertical-align: middle;
+}
+
+/* ─── TOAST NOTIFICATION ─── */
+.toast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  padding: 12px 24px;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  pointer-events: none;
+  z-index: 9999;
+  white-space: nowrap;
+}
+
+.toast-show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
