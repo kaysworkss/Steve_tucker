@@ -75,6 +75,16 @@ function collectorLine(token) {
   return `<p class="card-collectors">Collected by ${shown}${extra}</p>`;
 }
 
+function streetViewUrl(token) {
+  if (!token?.lat || !token?.lng) return "";
+  return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${token.lat},${token.lng}`;
+}
+
+function locationUrl(token) {
+  if (!token?.lat || !token?.lng) return "";
+  return `https://www.google.com/maps/search/?api=1&query=${token.lat},${token.lng}`;
+}
+
 function updateCardAvailability(card, token) {
   const existing = card.querySelector(".card-avail");
   if (existing) existing.remove();
@@ -103,6 +113,16 @@ function updateCardAvailability(card, token) {
   const body = card.querySelector(".card-body");
   body.appendChild(div);
   body.insertAdjacentHTML("beforeend", collectorLine(token));
+  if (streetViewUrl(token)) {
+    const a = document.createElement("a");
+    a.className = "street-link";
+    a.href = streetViewUrl(token);
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = "Street view";
+    a.addEventListener("click", e => e.stopPropagation());
+    body.appendChild(a);
+  }
 }
 // ── Gallery card ──────────────────────────────────────────────────────────────
 function addCard(token, i) {
@@ -180,6 +200,9 @@ function carouselHTML(key, tokens, idx) {
     : t.soldOut
     ? `<span class="c-sold">${t.availabilityText || "Sold out"}</span>`
     : `<a class="c-collect c-collect--ghost" href="${t.objktUrl}" target="_blank" rel="noopener">View on objkt</a>`;
+  const street = streetViewUrl(t)
+    ? `<a class="c-open c-street" href="${streetViewUrl(t)}" target="_blank" rel="noopener">Street view</a>`
+    : "";
   const tokenIdx = TOKENS.indexOf(t);
   return `<div class="carousel-popup" data-key="${key}">
     <div class="c-img-wrap">
@@ -192,6 +215,7 @@ function carouselHTML(key, tokens, idx) {
       <p class="c-title">${t.name}</p>
       <p class="c-meta">${[t.date, t.loc].filter(Boolean).join(" · ")}</p>
       ${avail}
+      ${street}
       <button class="c-open" onclick="openLightbox(${tokenIdx})">Open →</button>
     </div>
     ${tokens.length > 1 ? `<div class="c-dots">${dots}</div>` : ""}
@@ -257,6 +281,16 @@ function setupLightbox() {
   const lbSupply   = document.getElementById("lb-supply");
   const lbCollect  = document.getElementById("lb-collect");
   const lbLocate   = document.getElementById("lb-locate");
+  let lbStreet = document.getElementById("lb-street");
+  if (!lbStreet && lbLocate?.parentElement) {
+    lbStreet = document.createElement("a");
+    lbStreet.id = "lb-street";
+    lbStreet.className = "lb-btn lb-btn--locate";
+    lbStreet.target = "_blank";
+    lbStreet.rel = "noopener";
+    lbStreet.textContent = "Street view";
+    lbLocate.parentElement.appendChild(lbStreet);
+  }
 
   window.openLightbox = function(i) {
     currentIdx = i;
@@ -304,6 +338,12 @@ function setupLightbox() {
       } else {
         lbLocate.style.display = "none";
       }
+    }
+
+    if (lbStreet) {
+      const url = streetViewUrl(t) || locationUrl(t);
+      lbStreet.style.display = url ? "" : "none";
+      lbStreet.href = url || "#";
     }
 
     lb.classList.add("open");
