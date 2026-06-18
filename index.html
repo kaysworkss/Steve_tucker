@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -75,8 +75,9 @@
         </p>
         <p class="about-body">
           A stranger named Matt Stamper found him at the lodge, photographed his
-          sketchbooks, and shared them on X. The thread went viral. The Tezos
-          community stepped in to put Steve's work on-chain, so it lives forever.
+          sketchbooks, and shared them on X. The thread went viral. Matt decided
+          to help Steve sell some of his works on the Tezos chain, and so far,
+          they have started finding their homes.
         </p>
         <a class="about-link" href="https://x.com/Sneketoshi/status/2065910638950395918" target="_blank" rel="noopener">
           Read the full thread on X ↗
@@ -184,33 +185,9 @@
   <script src="js/app.js"></script>
   <script src="js/wallet.js"></script>
 
-  <!-- Load official tweet embed asynchronously — replaces fallback card if it works -->
+  <!-- Keep the local tweet card visible so this section stays compact. -->
   <script>
-    (function() {
-      var TWEET_URL = "https://x.com/Sneketoshi/status/2065910638950395918";
-      fetch("https://publish.twitter.com/oembed?url=" + encodeURIComponent(TWEET_URL) + "&omit_script=false&dnt=true")
-        .then(r => r.json())
-        .then(data => {
-          var embed = document.getElementById("tweet-embed");
-          var card  = document.getElementById("tweet-card");
-          if (!embed || !data.html) return;
-          embed.innerHTML = data.html;
-          embed.style.display = "";
-          if (card) card.style.display = "none";
-          // Load the twitter widgets script if not already present
-          if (!window.twttr) {
-            var s = document.createElement("script");
-            s.src = "https://platform.twitter.com/widgets.js";
-            s.async = true;
-            document.body.appendChild(s);
-          } else if (window.twttr.widgets) {
-            window.twttr.widgets.load(embed);
-          }
-        })
-        .catch(function() {
-          // Fallback card already visible — nothing to do
-        });
-    })();
+    document.getElementById("tweet-embed")?.remove();
   </script>
 </body>
 </html>
