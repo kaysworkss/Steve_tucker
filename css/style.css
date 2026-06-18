@@ -517,8 +517,8 @@ body {
   pointer-events: auto;
 }
 
-/* On coarse-pointer (touch) devices, show overlay as bottom gradient strip */
-@media (pointer: coarse) {
+/* On mobile, show overlay as persistent bottom gradient strip */
+@media (max-width: 600px) {
   .card-overlay {
     opacity: 1;
     pointer-events: auto;
@@ -565,7 +565,7 @@ body {
 .card-action--hidden { display: none; }
 
 /* Mobile: shrink text and padding so both buttons fit in narrow cards */
-@media (pointer: coarse) {
+@media (max-width: 600px) {
   .card-action {
     font-size: 0.48rem;
     letter-spacing: 0.06em;
@@ -579,9 +579,7 @@ body {
     border-color: rgba(124,51,23,0.75);
     background: rgba(124,51,23,0.5);
     flex: 0 0 auto;
-    /* Show just a pin icon on very narrow cards */
   }
-  /* When only one button visible (no map), stretch it */
   .card-action--detail:only-child,
   .card-action--map.card-action--hidden ~ .card-action--detail {
     flex: 1;
