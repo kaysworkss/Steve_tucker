@@ -1,42 +1,59 @@
-// ─── CONTRACT ─────────────────────────────────────────────────────────────────
+// ─── THE ONLY CONFIG NEEDED ───────────────────────────────────────────────────
+// Everything else — tokens, locations, dates, collectors — is read automatically
+// from the Tezos blockchain and the sketch images themselves.
+
 const CONTRACT   = "KT1V35dHCUUpXT9ZUbCY58KbWJzkgEpeE5E9";
 const OBJKT_BASE = "https://objkt.com/tokens/" + CONTRACT + "/";
-const TZKT_API   = "https://api.tzkt.io/v1";
 
-// ─── KNOWN TOKENS ─────────────────────────────────────────────────────────────
-// Keyed by tokenId (integer). Built from the live chain data on 2026-06-18.
-// - localImg: path to optimised local JPEG (fast, no IPFS needed)
-// - loc / date: extracted from on-chain description field
-// - For NEW tokens Tucker mints after this date, this map won't have an entry —
-//   chain.js falls back to the IPFS displayUri automatically.
-
-const KNOWN = {
-   0: { localImg: null,              loc: "Philmont Scout Ranch, NM",       date: "" },
-   1: { localImg: null,              loc: "Philmont Scout Ranch, NM",       date: "" },
-   2: { localImg: null,              loc: "Philmont Scout Ranch, NM",       date: "" },
-   3: { localImg: null,              loc: "Upper Peninsula, Michigan",       date: "" },
-   4: { localImg: null,              loc: "Cimarron, NM",                   date: "Jun 7, 2009" },
-   5: { localImg: null,              loc: "Red River Gorge, KY",            date: "Jun 7, 2014" },
-   6: { localImg: "images/s0.jpg",   loc: "Taos Pueblo, NM",                date: "Jul 3, 2009" },
-   7: { localImg: "images/s13.jpg",  loc: "Southern Illinois",               date: "" },
-   8: { localImg: "images/s12.jpg",  loc: "Taos Indian Casino, NM",          date: "Jul 3, 2009" },
-   9: { localImg: "images/s11.jpg",  loc: "Cimarron, NM",                   date: "May 28, 2009" },
-  10: { localImg: "images/s10.jpg",  loc: "Polihale State Park, Kauai, HI", date: "Aug 7, 2011" },
-  11: { localImg: null,              loc: "Polihale State Park, Kauai, HI", date: "Aug 7, 2011" },
-  12: { localImg: "images/s9.jpg",   loc: "Old Koloa Town, Kauai, HI",      date: "Aug 5, 2011" },
-  13: { localImg: "images/s8.jpg",   loc: "Hanalei, Kauai, HI",             date: "Jul 31, 2011" },
-  14: { localImg: "images/s7.jpg",   loc: "Port Allen, Kauai, HI",          date: "Jul 30, 2011" },
-  15: { localImg: "images/s6.jpg",   loc: "Koloa, Kauai, HI",               date: "Jul 30, 2011" },
-  16: { localImg: "images/s5.jpg",   loc: "Pictured Rocks N.L., MI",        date: "Aug 9, 2012" },
-  17: { localImg: "images/s4.jpg",   loc: "Slade, KY",                      date: "Jun 7, 2014" },
-  18: { localImg: "images/s3.jpg",   loc: "North Shore, Kauai, HI",         date: "Aug 4, 2011" },
-  19: { localImg: "images/s2.jpg",   loc: "Southern Illinois",               date: "Oct 19, 2019" },
-  20: { localImg: "images/s1.jpg",   loc: "Kealia Beach, Kauai, HI",        date: "Aug 4, 2011" },
-  21: { localImg: "images/s0.jpg",   loc: "Taos Pueblo, NM",                date: "Jul 3, 2009" },
-  // ── Add new entries here when Tucker mints ─────────────────────────────────
-  // Format: tokenId: { localImg: "images/sXX.jpg", loc: "Place, State", date: "Mon DD, YYYY" }
-  // If you don't add an entry, the site still works — it just loads from IPFS.
+// Optimised local images for the first 14 sketches.
+// New tokens load from IPFS automatically — no entry needed here.
+// Add an entry only if you want a faster/smaller local image for a new sketch.
+const LOCAL_IMAGES = {
+  "rend lake":              "images/s13.jpg",
+  "lady security officer":  "images/s12.jpg",
+  "cimarron":               "images/s11.jpg",
+  "barking sands beach":    "images/s10.jpg",
+  "banyan tree":            "images/s9.jpg",
+  "hanalei":                "images/s8.jpg",
+  "glass beach":            "images/s7.jpg",
+  "koloa landing":          "images/s6.jpg",
+  "twelvemile beach":       "images/s5.jpg",
+  "skylift":                "images/s4.jpg",
+  "north shore campers":    "images/s3.jpg",
+  "nature's line art":      "images/s2.jpg",
+  "wind-blown tree":        "images/s1.jpg",
+  "red willow creek":       "images/s0.jpg",
 };
 
-// Runtime — filled by chain.js
+// Runtime — populated by chain.js on every page load
 let TOKENS = [];
+
+// Local fallback records for the bundled sketches. These render immediately when
+// the blockchain API is unavailable, then live data replaces/enriches them.
+const FALLBACK_TOKENS = [
+  { tokenId: 0,  name: "Red Willow Creek",       loc: "New Mexico",             date: "2009", img: "images/s0.jpg",  lat: 36.7050, lng: -105.5720 },
+  { tokenId: 1,  name: "Wind-Blown Tree",        loc: "New Mexico",             date: "2009", img: "images/s1.jpg",  lat: 35.0844, lng: -106.6504 },
+  { tokenId: 2,  name: "Nature's Line Art",      loc: "Indiana",                date: "2010", img: "images/s2.jpg",  lat: 39.7684, lng: -86.1581 },
+  { tokenId: 3,  name: "North Shore Campers",    loc: "Kauai, Hawaii",          date: "2011", img: "images/s3.jpg",  lat: 22.2093, lng: -159.4686 },
+  { tokenId: 4,  name: "Skylift",                loc: "Indiana",                date: "2011", img: "images/s4.jpg",  lat: 38.7387, lng: -86.4169 },
+  { tokenId: 5,  name: "Twelvemile Beach",       loc: "Michigan",               date: "2012", img: "images/s5.jpg",  lat: 46.6500, lng: -86.1500 },
+  { tokenId: 6,  name: "Koloa Landing",          loc: "Koloa, Kauai, HI",        date: "2012", img: "images/s6.jpg",  lat: 21.8779, lng: -159.4736 },
+  { tokenId: 7,  name: "Glass Beach",            loc: "Port Allen, Kauai, HI",   date: "2012", img: "images/s7.jpg",  lat: 21.9024, lng: -159.5904 },
+  { tokenId: 8,  name: "Hanalei",                loc: "Hanalei, Kauai, HI",      date: "2012", img: "images/s8.jpg",  lat: 22.2034, lng: -159.4971 },
+  { tokenId: 9,  name: "Banyan Tree",            loc: "Hawaii",                 date: "2012", img: "images/s9.jpg",  lat: 21.3069, lng: -157.8583 },
+  { tokenId: 10, name: "Barking Sands Beach",    loc: "Kauai, Hawaii",          date: "2012", img: "images/s10.jpg", lat: 22.0373, lng: -159.7850 },
+  { tokenId: 11, name: "Cimarron",               loc: "Cimarron, New Mexico",    date: "2013", img: "images/s11.jpg", lat: 36.5109, lng: -104.9158 },
+  { tokenId: 12, name: "Lady Security Officer",  loc: "United States",          date: "2013", img: "images/s12.jpg", lat: 39.8283, lng: -98.5795 },
+  { tokenId: 13, name: "Rend Lake",              loc: "Southern Illinois",       date: "2013", img: "images/s13.jpg", lat: 38.0714, lng: -88.9673 },
+].map(t => ({
+  subtitle: "",
+  ipfsImg: "",
+  supply: 0,
+  holders: 0,
+  listed: null,
+  soldOut: false,
+  price: null,
+  objktUrl: OBJKT_BASE + t.tokenId,
+  _isFallback: true,
+  ...t,
+}));

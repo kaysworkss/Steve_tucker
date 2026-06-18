@@ -10,11 +10,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   const counter = document.getElementById("sketch-count");
   grid.innerHTML = `<p class="loading-msg" style="grid-column:1/-1">Loading from the blockchain…</p>`;
 
-  mapInstance = L.map("map", { scrollWheelZoom: false }).setView([36, -100], 4);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "© <a href='https://openstreetmap.org'>OpenStreetMap</a>", maxZoom: 18,
-  }).addTo(mapInstance);
-  markersLayer = L.layerGroup().addTo(mapInstance);
+  if (window.L) {
+    mapInstance = L.map("map", { scrollWheelZoom: false }).setView([36, -100], 4);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© <a href='https://openstreetmap.org'>OpenStreetMap</a>", maxZoom: 18,
+    }).addTo(mapInstance);
+    markersLayer = L.layerGroup().addTo(mapInstance);
+  } else {
+    document.getElementById("map").innerHTML = `<p class="loading-msg">Map unavailable. The sketches still load below.</p>`;
+  }
 
   try { await loadAllTokens(); }
   catch {
@@ -123,7 +127,7 @@ const PIN_SVG = `<svg width="18" height="26" viewBox="0 0 18 26" xmlns="http://w
 </svg>`;
 
 function addPin(token) {
-  if (!token.lat || !token.lng) return;
+  if (!window.L || !markersLayer || !token.lat || !token.lng) return;
 
   const grouped = TOKENS.filter(t =>
     t.lat && t.lng &&
@@ -267,7 +271,7 @@ function setupLightbox() {
     }
 
     if (lbLocate) {
-      if (t.lat && t.lng) {
+      if (mapInstance && t.lat && t.lng) {
         lbLocate.style.display = "";
         lbLocate.onclick = () => {
           closeLightbox();

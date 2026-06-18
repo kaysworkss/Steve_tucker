@@ -1,157 +1,294 @@
-// ─── CHAIN.JS ─────────────────────────────────────────────────────────────────
-// Reads all tokens from TzKT. For each token:
-//   1. Checks KNOWN[tokenId] for a local image and cached loc/date
-//   2. Falls back to IPFS displayUri for the image if no local file
-//   3. Falls back to Claude vision + Nominatim geocoding for new tokens
-// No fuzzy matching. No name guessing. TokenId is the single source of truth.
+﻿// ─── CHAIN.JS — reads everything from Tezos via TzKT + Claude vision ─────────
+// No hardcoded coords. Location is extracted from the sketch image itself.
 
-const IPFS_GATEWAYS = [
-  "https://ipfs.io/ipfs/",
-  "https://cloudflare-ipfs.com/ipfs/",
-  "https://gateway.pinata.cloud/ipfs/",
-];
+const TZKT     = "https://api.tzkt.io/v1";
+const IPFS_GW  = "https://ipfs.io/ipfs/";
+const IPFS_GW2 = "https://cloudflare-ipfs.com/ipfs/"; // fallback gateway
 
-function ipfsToHttp(uri, gatewayIndex = 0) {
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function ipfsToHttp(uri, gateway = IPFS_GW) {
   if (!uri) return null;
-  if (uri.startsWith("ipfs://")) return IPFS_GATEWAYS[gatewayIndex] + uri.slice(7);
+  if (uri.startsWith("ipfs://")) return gateway + uri.slice(7);
   return uri;
 }
 
-// ── 1. Load all tokens ────────────────────────────────────────────────────────
-async function loadAllTokens() {
-  const res = await fetch(`${TZKT_API}/tokens?contract=${CONTRACT}&limit=200&sort.asc=tokenId`);
-  if (!res.ok) throw new Error("TzKT " + res.status);
-  const raw = await res.json();
-
-  TOKENS = raw.map(t => {
-    const tid  = parseInt(t.tokenId);
-    const meta = t.metadata || {};
-    const known = KNOWN[tid] || {};
-
-    // Image: local file → IPFS (no fallback chain, just two clear options)
-    const ipfsImg = ipfsToHttp(meta.displayUri || meta.artifactUri);
-    const img     = known.localImg || ipfsImg || "";
-
-    // Location + date: KNOWN table → parse from description → blank
-    let loc  = known.loc  || "";
-    let date = known.date || "";
-
-    // For unknown tokens, try parsing description (format Tucker uses: "Place\n\nDate")
-    if ((!loc || !date) && meta.description) {
-      const parts = meta.description.split(/\n\n/).map(s => s.trim()).filter(Boolean);
-      if (parts.length >= 2 && !loc)  loc  = parts[0];
-      if (parts.length >= 2 && !date) date = parts[parts.length - 1];
-      if (parts.length === 1 && !loc) loc  = parts[0];
-    }
-
-    return {
-      tokenId:  tid,
-      name:     meta.name || `Token #${tid}`,
-      subtitle: meta.description || "",
-      loc,
-      date,
-      img,
-      ipfsImg,
-      supply:   parseInt(t.totalSupply) || 0,
-      holders:  t.holdersCount || 0,
-      objktUrl: OBJKT_BASE + tid,
-      // lat/lng start null; filled by geocoding for unknown tokens
-      lat: null,
-      lng: null,
-    };
-  });
-
-  return TOKENS;
+// Pull a named attribute from TZIP-21 attributes array (if Tucker ever adds them)
+function attr(meta, name) {
+  if (!meta?.attributes) return null;
+  const a = meta.attributes.find(x => x.name?.toLowerCase() === name.toLowerCase());
+  return a?.value ?? null;
 }
 
-// ── 2. Geocoding — only runs for tokens not in KNOWN ─────────────────────────
-// Uses OpenStreetMap Nominatim (free, no key). Results cached in localStorage.
-
-const GEO_CACHE_KEY = "tucker_geo_v1";
-
-function geoCache() {
-  try { return JSON.parse(localStorage.getItem(GEO_CACHE_KEY) || "{}"); } catch { return {}; }
-}
-function saveGeo(cache) {
-  try { localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(cache)); } catch {}
+function localImageFor(name) {
+  const n = name.toLowerCase();
+  const key = Object.keys(LOCAL_IMAGES).find(k => n.includes(k) || k.includes(n.split(/[–—,]/)[0].trim()));
+  return key ? LOCAL_IMAGES[key] : null;
 }
 
-// Hardcoded coords for KNOWN tokens — no geocoding needed for these
-const KNOWN_COORDS = {
-  // Philmont Scout Ranch, NM
-  0: { lat: 36.469, lng: -104.894 },
-  1: { lat: 36.469, lng: -104.894 },
-  2: { lat: 36.469, lng: -104.894 },
-  // Tahquamenon River, UP Michigan
-  3: { lat: 46.596, lng: -85.234 },
-  // Cimarron, NM
-  4: { lat: 36.511, lng: -104.914 },
-  5: { lat: 37.774, lng: -83.683 }, // Red River Gorge KY
-  6: { lat: 36.443, lng: -105.549 }, // Taos Pueblo
-  7: { lat: 37.997, lng: -88.877 },  // Rend Lake IL
-  8: { lat: 36.407, lng: -105.573 }, // Taos Indian Casino
-  9: { lat: 36.511, lng: -104.914 }, // Cimarron NM
-  10:{ lat: 22.075, lng: -159.765 }, // Polihale Kauai
-  11:{ lat: 22.075, lng: -159.765 }, // Polihale Kauai (duplicate)
-  12:{ lat: 21.904, lng: -159.472 }, // Old Koloa Kauai
-  13:{ lat: 22.204, lng: -159.498 }, // Hanalei Kauai
-  14:{ lat: 21.898, lng: -159.594 }, // Glass Beach Kauai
-  15:{ lat: 21.882, lng: -159.468 }, // Koloa Landing Kauai
-  16:{ lat: 46.516, lng: -86.378 },  // Pictured Rocks MI
-  17:{ lat: 37.774, lng: -83.683 },  // Natural Bridge KY
-  18:{ lat: 22.217, lng: -159.502 }, // North Shore Kauai
-  19:{ lat: 37.800, lng: -88.900 },  // Southern Illinois
-  20:{ lat: 22.079, lng: -159.322 }, // Kealia Beach Kauai
-  21:{ lat: 36.443, lng: -105.549 }, // Taos Pueblo
-};
+// ── GEOCODING — place name → lat/lng via Nominatim (free, no key) ─────────────
+const geocodeCache = {};
 
 async function geocode(placeName) {
-  const cache = geoCache();
-  if (cache[placeName]) return cache[placeName];
+  if (!placeName) return null;
+  if (geocodeCache[placeName]) return geocodeCache[placeName];
+
   try {
+    const q = encodeURIComponent(placeName);
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(placeName)}&format=json&limit=1`,
+      `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`,
       { headers: { "Accept-Language": "en", "User-Agent": "TuckerSketchbook/1.0" } }
     );
     const data = await res.json();
     if (data.length > 0) {
       const result = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-      cache[placeName] = result;
-      saveGeo(cache);
+      geocodeCache[placeName] = result;
       return result;
     }
-  } catch (e) { console.warn("Geocode failed:", placeName, e); }
+  } catch (e) {
+    console.warn("Geocode failed for", placeName, e);
+  }
   return null;
 }
 
-// Apply coords and geocode unknown tokens in the background
-async function applyCoords(onUpdate) {
-  for (const token of TOKENS) {
-    const known = KNOWN_COORDS[token.tokenId];
-    if (known) {
-      token.lat = known.lat;
-      token.lng = known.lng;
-      if (onUpdate) onUpdate(token);
-    } else if (token.loc) {
-      // Unknown future token — geocode from loc string
-      const coords = await geocode(token.loc);
-      if (coords) {
-        token.lat = coords.lat;
-        token.lng = coords.lng;
-        if (onUpdate) onUpdate(token);
-      }
-      await new Promise(r => setTimeout(r, 500)); // rate limit
+// ── VISION — call Claude API to read handwritten text from sketch image ────────
+// Uses the Anthropic API (available in artifacts/client-side via the site)
+async function extractLocationFromImage(imageUrl) {
+  try {
+    // Fetch the image and convert to base64
+    let url = imageUrl;
+    let imgRes = await fetch(url).catch(() => null);
+
+    // Try fallback gateway if first fails
+    if (!imgRes || !imgRes.ok) {
+      url = imageUrl.replace(IPFS_GW, IPFS_GW2);
+      imgRes = await fetch(url).catch(() => null);
     }
+    if (!imgRes || !imgRes.ok) return null;
+
+    const blob = await imgRes.blob();
+    const base64 = await new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(",")[1]);
+      reader.readAsDataURL(blob);
+    });
+    const mimeType = blob.type || "image/jpeg";
+
+    // Call Claude vision
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 200,
+        messages: [{
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: { type: "base64", media_type: mimeType, data: base64 }
+            },
+            {
+              type: "text",
+              text: `This is a field sketch by an artist. Look at any handwritten text on the image — typically written at the bottom or sides. Extract:
+1. The location/place name (e.g. "Glass Beach", "Rend Lake", "Taos Pueblo")
+2. The full location with state/country if present (e.g. "Port Allen, Kauai, HI" or "Southern Illinois")
+3. The date if present (e.g. "Jul 30, 2011" or "7-30-11")
+
+Respond ONLY with valid JSON, no markdown:
+{"name":"...", "location":"...", "date":"..."}`
+            }
+          ]
+        }]
+      })
+    });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    const text = data.content?.[0]?.text?.trim();
+    if (!text) return null;
+
+    try {
+      return JSON.parse(text.replace(/```json|```/g, "").trim());
+    } catch {
+      return null;
+    }
+  } catch (err) {
+    console.warn("Vision extraction failed:", err);
+    return null;
   }
 }
 
-// ── 3. Collectors ─────────────────────────────────────────────────────────────
+// ── CACHE — persist extracted location data in localStorage ───────────────────
+const CACHE_KEY = `tucker_locations_${CONTRACT}`;
+
+function loadCache() {
+  try {
+    return JSON.parse(localStorage.getItem(CACHE_KEY) || "{}");
+  } catch { return {}; }
+}
+
+function saveCache(cache) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch {}
+}
+
+// ── MAIN: load all tokens + extract locations ─────────────────────────────────
+
+async function loadAllTokens() {
+  let raw = [];
+  try {
+    const url = `${TZKT}/tokens?contract=${CONTRACT}&limit=200&sort.asc=tokenId`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("TzKT " + res.status);
+    raw = await res.json();
+  } catch (err) {
+    console.warn("Using local Tucker sketch fallback:", err);
+    TOKENS = [...FALLBACK_TOKENS];
+    return TOKENS;
+  }
+
+  if (!raw.length) {
+    TOKENS = [...FALLBACK_TOKENS];
+    return TOKENS;
+  }
+
+  const cache = loadCache();
+
+  // 2. Build initial token objects
+  TOKENS = raw.map(t => {
+    const meta   = t.metadata || {};
+    const name   = meta.name || `Token #${t.tokenId}`;
+    const imgUri = ipfsToHttp(meta.displayUri || meta.artifactUri);
+    const local  = localImageFor(name);
+
+    // Check if on-chain attributes already have coords (future-proof)
+    const latAttr = parseFloat(attr(meta, "lat"));
+    const lngAttr = parseFloat(attr(meta, "lng"));
+
+    // Check cache
+    const cached = cache[t.tokenId];
+
+    return {
+      tokenId:  t.tokenId,
+      name,
+      subtitle: meta.description || "",
+      img:      local || imgUri || "",
+      ipfsImg:  imgUri,
+      supply:   parseInt(t.totalSupply) || 0,
+      holders:  t.holdersCount || 0,
+      objktUrl: OBJKT_BASE + t.tokenId,
+      listed:   null,
+      soldOut:  false,
+      price:    null,
+      // From chain attributes (if Tucker adds them later)
+      lat:      isNaN(latAttr) ? null : latAttr,
+      lng:      isNaN(lngAttr) ? null : lngAttr,
+      // From cache (previously extracted by vision)
+      loc:      cached?.loc  || attr(meta, "location") || "",
+      date:     cached?.date || attr(meta, "date") || "",
+      // Will be filled by vision + geocoding
+      _needsExtraction: !cached && isNaN(latAttr),
+    };
+  });
+
+  // Apply cached coords
+  for (const t of TOKENS) {
+    const cached = cache[t.tokenId];
+    if (cached?.lat) { t.lat = cached.lat; t.lng = cached.lng; }
+  }
+
+  return TOKENS;
+}
+
+// ── Run vision + geocoding for tokens that need it ────────────────────────────
+// Called after gallery renders so the UI isn't blocked.
+// Processes one token at a time to avoid rate limits.
+
+async function enrichTokensWithVision(onTokenUpdated) {
+  const cache  = loadCache();
+  const needed = TOKENS.filter(t => t._needsExtraction && !cache[t.tokenId]);
+
+  if (needed.length === 0) return;
+
+  for (const token of needed) {
+    // Skip tokens with no IPFS image
+    if (!token.ipfsImg) continue;
+
+    try {
+      // Step 1: Claude reads the sketch image
+      const extracted = await extractLocationFromImage(token.ipfsImg);
+      if (!extracted) continue;
+
+      token.loc  = extracted.location || extracted.name || "";
+      token.date = extracted.date || "";
+
+      // Step 2: Geocode the extracted location
+      const searchTerm = extracted.location || extracted.name;
+      const coords = await geocode(searchTerm);
+      if (coords) {
+        token.lat = coords.lat;
+        token.lng = coords.lng;
+      }
+
+      // Cache the result
+      cache[token.tokenId] = {
+        loc:  token.loc,
+        date: token.date,
+        lat:  token.lat,
+        lng:  token.lng,
+      };
+      saveCache(cache);
+      token._needsExtraction = false;
+
+      // Notify app.js to update this token's card + map pin
+      if (onTokenUpdated) onTokenUpdated(token);
+
+    } catch (err) {
+      console.warn(`Vision failed for token ${token.tokenId}:`, err);
+    }
+
+    // Small delay between tokens to be kind to rate limits
+    await new Promise(r => setTimeout(r, 800));
+  }
+}
+
+async function fetchAvailability() {
+  // Availability is optional; keep the gallery usable even when objkt/TzKT data
+  // is unavailable or the local fallback dataset is being shown.
+  TOKENS.forEach(t => {
+    if (typeof t.listed === "undefined") t.listed = null;
+    if (typeof t.soldOut === "undefined") t.soldOut = false;
+    if (typeof t.price === "undefined") t.price = null;
+  });
+}
+
+async function applyCoords(onTokenReady) {
+  TOKENS.filter(t => t.lat && t.lng).forEach(t => onTokenReady?.(t));
+
+  if (TOKENS.some(t => t._isFallback)) return;
+
+  enrichTokensWithVision(token => {
+    const card = document.querySelector(`.sketch-card[data-token-id="${token.tokenId}"]`);
+    if (card) {
+      card.querySelector(".card-loc").textContent = token.loc || "—";
+      card.querySelector(".card-date").textContent = token.date || "";
+    }
+    if (token.lat && token.lng) onTokenReady?.(token);
+  });
+}
+
+function startLiveUpdates() {
+  // Placeholder for future SignalR/event wiring. The static site should not fail
+  // if live update transport is absent.
+}
+
+// ── COLLECTORS ────────────────────────────────────────────────────────────────
+
 async function loadAllHolders() {
   let all = [], offset = 0;
   while (true) {
-    const res = await fetch(
-      `${TZKT_API}/tokens/balances?token.contract=${CONTRACT}&balance.gt=0&limit=500&offset=${offset}&select=account,balance,token`
-    );
+    const url = `${TZKT}/tokens/balances?token.contract=${CONTRACT}&balance.gt=0&limit=500&offset=${offset}&select=account,balance,token`;
+    const res  = await fetch(url);
     if (!res.ok) break;
     const batch = await res.json();
     all = all.concat(batch);
@@ -162,9 +299,8 @@ async function loadAllHolders() {
 }
 
 async function loadWalletHoldings(address) {
-  const res = await fetch(
-    `${TZKT_API}/tokens/balances?token.contract=${CONTRACT}&account=${address}&balance.gt=0&select=token,balance`
-  );
+  const url = `${TZKT}/tokens/balances?token.contract=${CONTRACT}&account=${address}&balance.gt=0&select=token,balance`;
+  const res  = await fetch(url);
   if (!res.ok) throw new Error("TzKT wallet " + res.status);
   return res.json();
 }
@@ -174,25 +310,30 @@ async function renderCollectors() {
   wrap.innerHTML = `<p class="loading-msg">Reading the Tezos blockchain…</p>`;
   try {
     const balances = await loadAllHolders();
-    const BURN = "tz1burnburnburnburnburnburnburjAYjjX";
-    const byAddr = {};
+    const BURN     = "tz1burnburnburnburnburnburnburjAYjjX";
+    const byAddr   = {};
+
     for (const b of balances) {
       const addr = b.account.address;
       if (addr === BURN) continue;
       if (!byAddr[addr]) byAddr[addr] = { total: 0, tokenIds: [] };
       byAddr[addr].total += Number(b.balance);
-      byAddr[addr].tokenIds.push(parseInt(b.token.tokenId));
+      byAddr[addr].tokenIds.push(b.token.tokenId);
     }
+
     const entries = Object.entries(byAddr).sort((a, b) => b[1].total - a[1].total);
     const totalEl = document.getElementById("collectors-total");
     if (totalEl) totalEl.textContent = `${entries.length} collector${entries.length !== 1 ? "s" : ""}`;
-    if (!entries.length) {
-      wrap.innerHTML = `<p class="collectors-empty">No collectors found on-chain yet.</p>`; return;
+
+    if (entries.length === 0) {
+      wrap.innerHTML = `<p class="collectors-empty">No collectors found on-chain yet.</p>`;
+      return;
     }
+
     const rows = entries.map(([addr, info], i) => {
       const short = addr.slice(0, 7) + "…" + addr.slice(-5);
       const works = info.tokenIds
-        .map(tid => TOKENS.find(t => t.tokenId === tid)?.name || `#${tid}`)
+        .map(tid => TOKENS.find(t => t.tokenId == tid)?.name || `#${tid}`)
         .filter((v, j, a) => a.indexOf(v) === j).slice(0, 3).join(", ");
       return `<tr class="collector-row" data-addr="${addr}">
         <td class="col-rank">${i + 1}</td>
@@ -207,9 +348,12 @@ async function renderCollectors() {
         <td class="col-works">${works || "—"}</td>
       </tr>`;
     }).join("");
-    wrap.innerHTML = `<table class="collectors-table">
-      <thead><tr><th>#</th><th>Collector</th><th>Held</th><th>Works</th></tr></thead>
-      <tbody>${rows}</tbody></table>`;
+
+    wrap.innerHTML = `
+      <table class="collectors-table">
+        <thead><tr><th>#</th><th>Collector</th><th>Held</th><th>Works</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
   } catch (err) {
     console.error(err);
     wrap.innerHTML = `<p class="collectors-empty">Could not reach the blockchain. Reload to try again.</p>`;
@@ -227,7 +371,8 @@ async function markWalletOwned(address) {
         count++;
         if (!existing) {
           const b = document.createElement("div");
-          b.className = "card-owned"; b.textContent = "Collected";
+          b.className = "card-owned";
+          b.textContent = "Collected";
           card.appendChild(b);
         }
       } else if (existing) existing.remove();
@@ -239,102 +384,7 @@ async function markWalletOwned(address) {
       : `You hold ${count} Tucker sketches — marked in the gallery.`;
     document.querySelectorAll(".collector-row").forEach(r =>
       r.classList.toggle("is-me", r.dataset.addr === address));
-  } catch (err) { console.warn("Wallet holdings:", err); }
-}
-
-// ─── LIVE UPDATES via TzKT WebSocket (SignalR) ───────────────────────────────
-// Connects once on page load. When Tucker mints a new token, the site
-// fetches it from TzKT and adds the card + map pin without any page refresh.
-
-const TZKT_WS = "https://api.tzkt.io";
-
-async function startLiveUpdates(onNewToken) {
-  // SignalR is loaded via CDN in index.html
-  const connection = new signalR.HubConnectionBuilder()
-    .withUrl(TZKT_WS + "/v1/events")
-    .withAutomaticReconnect([1000, 2000, 5000, 10000])
-    .configureLogging(signalR.LogLevel.Warning)
-    .build();
-
-  // Subscribe to token transfers on this contract (mints are transfers from zero address)
-  connection.on("token_transfers", async (msg) => {
-    if (msg.type !== 1) return; // type 1 = data
-    for (const transfer of (msg.data || [])) {
-      // A mint = transfer where "from" is null
-      if (transfer.from !== null && transfer.from !== undefined) continue;
-      const tid = parseInt(transfer.token?.tokenId);
-      if (isNaN(tid)) continue;
-      // Skip if we already have this token
-      if (TOKENS.some(t => t.tokenId === tid)) continue;
-
-      // Fetch the full token metadata from TzKT
-      try {
-        const res = await fetch(`${TZKT_API}/tokens?contract=${CONTRACT}&tokenId=${tid}&limit=1`);
-        if (!res.ok) continue;
-        const [raw] = await res.json();
-        if (!raw) continue;
-
-        const meta  = raw.metadata || {};
-        const known = KNOWN[tid]   || {};
-        const ipfsImg = ipfsToHttp(meta.displayUri || meta.artifactUri);
-        const img     = known.localImg || ipfsImg || "";
-
-        let loc  = known.loc  || "";
-        let date = known.date || "";
-        if ((!loc || !date) && meta.description) {
-          const parts = meta.description.split(/\n\n/).map(s => s.trim()).filter(Boolean);
-          if (parts.length >= 2 && !loc)  loc  = parts[0];
-          if (parts.length >= 2 && !date) date = parts[parts.length - 1];
-          if (parts.length === 1 && !loc) loc  = parts[0];
-        }
-
-        const token = {
-          tokenId:  tid,
-          name:     meta.name || `Token #${tid}`,
-          subtitle: meta.description || "",
-          loc, date, img, ipfsImg,
-          supply:   parseInt(raw.totalSupply) || 0,
-          holders:  raw.holdersCount || 0,
-          objktUrl: OBJKT_BASE + tid,
-          lat: null, lng: null,
-        };
-
-        // Apply coords
-        const knownCoords = KNOWN_COORDS[tid];
-        if (knownCoords) {
-          token.lat = knownCoords.lat;
-          token.lng = knownCoords.lng;
-        } else if (token.loc) {
-          const coords = await geocode(token.loc);
-          if (coords) { token.lat = coords.lat; token.lng = coords.lng; }
-        }
-
-        TOKENS.push(token);
-        onNewToken(token);
-
-      } catch (err) {
-        console.warn("Failed to load new token", tid, err);
-      }
-    }
-  });
-
-  connection.onreconnected(() => {
-    // Re-subscribe after reconnect
-    subscribeToContract(connection);
-  });
-
-  try {
-    await connection.start();
-    await subscribeToContract(connection);
-    console.log("TzKT live updates connected");
   } catch (err) {
-    console.warn("TzKT WebSocket unavailable, live updates disabled:", err);
-    // Site still works fine without it — just no auto-update
+    console.warn("Wallet holdings error:", err);
   }
-}
-
-async function subscribeToContract(connection) {
-  await connection.invoke("SubscribeToTokenTransfers", {
-    contract: CONTRACT,
-  });
 }
