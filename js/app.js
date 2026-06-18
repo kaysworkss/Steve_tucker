@@ -46,7 +46,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   // setupLightbox BEFORE applyCoords so openLightbox is defined when pins are clicked
   setupLightbox();
   await applyCoords(token => {
-    if (DISPLAY_TOKENS.some(t => String(t.tokenId) === String(token.tokenId))) addPin(token);
+    if (DISPLAY_TOKENS.some(t => String(t.tokenId) === String(token.tokenId))) {
+      addPin(token);
+      refreshCardMapAction(token);
+    }
   });
   fitMapToPins();
   renderCollectors();
@@ -183,26 +186,6 @@ function updateCardAvailability(card, token) {
   const body = card.querySelector(".card-body");
   body.appendChild(div);
   body.insertAdjacentHTML("beforeend", collectorLine(token));
-  if (streetViewUrl(token)) {
-    const a = document.createElement("a");
-    a.className = "street-link";
-    a.href = streetViewUrl(token);
-    a.target = "_blank";
-    a.rel = "noopener";
-    a.textContent = "Street view";
-    a.addEventListener("click", e => e.stopPropagation());
-    body.appendChild(a);
-  }
-  if (placePhotosUrl(token)) {
-    const a = document.createElement("a");
-    a.className = "street-link place-photos-link";
-    a.href = placePhotosUrl(token);
-    a.target = "_blank";
-    a.rel = "noopener";
-    a.textContent = "Place photos";
-    a.addEventListener("click", e => e.stopPropagation());
-    body.appendChild(a);
-  }
 }
 // ── Gallery card ──────────────────────────────────────────────────────────────
 function addCard(token, i) {
@@ -214,21 +197,61 @@ function addCard(token, i) {
   card.setAttribute("tabindex", "0");
   card.setAttribute("role", "button");
   card.setAttribute("aria-label", `View ${token.name}`);
+
+  // Map action — only wired if coords exist at render time; refreshed by updateCardPin
+  const hasPin = !!(token.lat && token.lng);
+
   card.innerHTML = `
     <div class="card-img-wrap">
       <img class="card-img" src="${token.img}" alt="${token.name}" loading="lazy"
            onerror="this.parentElement.style.background='var(--paper-3)'">
+      <div class="card-overlay">
+        <span class="card-action card-action--detail">View details</span>
+        <span class="card-action card-action--map${hasPin ? "" : " card-action--hidden"}" data-map-action>View on map</span>
+      </div>
     </div>
     <div class="card-body">
       <p class="card-title">${token.name}</p>
       <p class="card-loc">${token.loc || "—"}</p>
       <p class="card-date">${token.date || ""}</p>
     </div>`;
-  card.addEventListener("click", () => openLightbox(i));
+
+  // "View details" opens lightbox
+  card.addEventListener("click", e => {
+    if (e.target.closest("[data-map-action]")) return; // let map action handle it
+    openLightbox(i);
+  });
   card.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") openLightbox(i); });
+
+  // "View on map" — scroll + fly to pin
+  const mapBtn = card.querySelector("[data-map-action]");
+  if (mapBtn) {
+    mapBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      if (!token.lat || !token.lng) return;
+      document.getElementById("map-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(() => {
+        if (mapInstance) mapInstance.flyTo([token.lat, token.lng], 10, { duration: 1.1 });
+        const pin = pinsByTokenId[token.tokenId];
+        if (pin) showCarousel(pin, DISPLAY_TOKENS.filter(x =>
+          x.lat?.toFixed(4) === token.lat.toFixed(4) &&
+          x.lng?.toFixed(4) === token.lng.toFixed(4)));
+      }, 400);
+    });
+  }
+
   grid.appendChild(card);
   if (token.listed !== null) updateCardAvailability(card, token);
   updateCardOwnedState(card);
+}
+
+// Called when a pin is added after the card already rendered (geocoding is async)
+function refreshCardMapAction(token) {
+  const card = document.querySelector(`.sketch-card[data-token-id="${token.tokenId}"]`)
+    || [...document.querySelectorAll(".sketch-card")].find(c => c.dataset.tokenId == token.tokenId);
+  if (!card) return;
+  const mapBtn = card.querySelector("[data-map-action]");
+  if (mapBtn) mapBtn.classList.remove("card-action--hidden");
 }
 
 // ── Map pin + carousel popup ──────────────────────────────────────────────────
