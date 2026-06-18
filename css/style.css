@@ -447,6 +447,28 @@ body {
 }
 .my-col-count { font-family: var(--font-display); font-size: 1.5rem; color: var(--ink); margin-bottom: 4px; }
 .my-col-sub   { font-size: 0.85rem; color: var(--ink-3); }
+.my-col-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.my-col-action {
+  border: 1px solid rgba(74,102,80,0.45);
+  background: transparent;
+  color: var(--sage);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+  padding: 8px 10px;
+}
+.my-col-action.active,
+.my-col-action:hover {
+  background: var(--sage);
+  color: var(--paper);
+}
 
 .gallery-grid {
   display: grid;
@@ -463,6 +485,11 @@ body {
   transition: background 0.15s;
 }
 .sketch-card:hover { background: var(--paper-2); }
+.sketch-card.is-owned {
+  background: rgba(74,102,80,0.08);
+  box-shadow: inset 0 0 0 2px rgba(74,102,80,0.38);
+}
+.show-owned-only .sketch-card:not(.is-owned) { display: none; }
 .sketch-card:focus-visible { outline: 2px solid var(--rust); outline-offset: -2px; }
 .card-img-wrap { aspect-ratio: 3/4; overflow: hidden; background: var(--paper-2); border-bottom: 1px solid var(--line); }
 .card-img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -500,6 +527,16 @@ body {
   font-family: var(--font-mono); font-size: 0.52rem;
   letter-spacing: 0.075em; text-transform: uppercase;
   padding: 3px 8px;
+}
+
+.map-pin-icon {
+  filter: drop-shadow(0 3px 6px rgba(22,18,12,0.22));
+}
+.map-pin-owned {
+  filter: drop-shadow(0 0 0 rgba(216,192,122,0.7)) drop-shadow(0 5px 10px rgba(22,18,12,0.28));
+}
+.show-owned-map #map {
+  box-shadow: inset 0 0 0 2px rgba(74,102,80,0.32);
 }
 
 /* ─── AVAILABILITY ────────────────────────────────────────────────────────── */
@@ -549,6 +586,19 @@ body {
 .collectors-table tr:hover td { background: var(--paper-2); }
 .collector-row.is-me td { background: rgba(74,102,80,0.08); }
 .collector-row.is-me .collector-name { color: var(--sage); }
+.collector-row.is-me .collector-name::after {
+  content: " You";
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  border: 1px solid rgba(74,102,80,0.45);
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sage);
+  vertical-align: middle;
+}
 .col-addr { display: flex; align-items: center; gap: 8px; }
 .collector-identity { display: flex; flex-direction: column; gap: 2px; }
 .collector-name { font-weight: 500; font-size: 0.88rem; color: var(--ink); }
@@ -858,6 +908,8 @@ footer {
   }
   .stat-num { font-size: 1.55rem; }
   .stat-label { font-size: 0.48rem; line-height: 1.45; overflow-wrap: anywhere; }
+  .my-col-actions { display: grid; grid-template-columns: 1fr; }
+  .my-col-action { width: 100%; }
 
   /* Section heads */
   .section-head { padding: 40px 5vw 0; }
