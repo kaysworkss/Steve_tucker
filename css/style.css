@@ -421,8 +421,7 @@ body {
   max-width: 980px; width: 100%;
   margin: auto;
 }
-.lb-img-wrap { flex: 0 0 auto; max-width: 52%; position: relative; }
-.lb-img { width: 100%; max-height: 80vh; object-fit: contain; display: block; border: 1px solid rgba(255,255,255,0.07); }
+.lb-img { max-width: 52%; max-height: 80vh; object-fit: contain; display: block; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.07); }
 .lb-info { flex: 1; color: var(--paper); padding-top: 4px; min-width: 0; }
 .lb-eyebrow {
   font-family: var(--font-mono); font-size: 0.58rem;
