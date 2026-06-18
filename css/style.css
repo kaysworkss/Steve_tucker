@@ -39,7 +39,7 @@ body {
   padding: 0 5vw;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   height: var(--header-h);
   gap: 12px;
 }
@@ -361,7 +361,7 @@ body {
   margin-bottom: 14px;
 }
 .tweet-avatar {
-  width: 40px; height: 40px;
+  width: 38px; height: 38px;
   border-radius: 50%;
   background: var(--ink);
   color: var(--paper);
@@ -370,19 +370,20 @@ body {
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
-.tweet-meta { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.tweet-name { font-weight: 600; font-size: 0.9rem; color: var(--ink); }
+.tweet-meta { flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.tweet-name { font-weight: 600; font-size: 0.88rem; color: var(--ink); }
 .tweet-handle { font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-3); }
-.tweet-x-logo { color: var(--ink-3); flex-shrink: 0; }
+.tweet-x-logo { color: var(--ink-3); transition: color 0.15s; }
+.tweet-x-logo:hover { color: var(--ink); }
 .tweet-body {
-  font-size: 0.96rem;
+  font-size: 0.95rem;
   line-height: 1.68;
   color: var(--ink);
   margin-bottom: 16px;
 }
 .tweet-footer {
   display: flex; align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
@@ -390,7 +391,7 @@ body {
   font-family: var(--font-mono);
   font-size: 0.6rem;
   letter-spacing: 0.075em;
-  color: var(--rust);
+  color: var(--ink-3);
   text-transform: uppercase;
 }
 
@@ -495,9 +496,8 @@ body {
   border-bottom: 1px solid var(--line);
   position: relative;
 }
-.card-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-/* ── Card overlay — appears on hover / focus-within ── */
+/* ── Card hover overlay — desktop: fade in on hover ── */
 .card-overlay {
   position: absolute;
   inset: 0;
@@ -516,21 +516,6 @@ body {
   opacity: 1;
   pointer-events: auto;
 }
-
-/* On mobile, show overlay as persistent bottom gradient strip */
-@media (max-width: 600px) {
-  .card-overlay {
-    opacity: 1;
-    pointer-events: auto;
-    background: linear-gradient(to top, rgba(22,18,12,0.78) 0%, rgba(22,18,12,0) 52%);
-    flex-direction: row;
-    align-items: flex-end;
-    justify-content: space-between;
-    padding: 0 8px 8px;
-    gap: 6px;
-  }
-}
-
 .card-action {
   font-family: var(--font-mono);
   font-size: 0.6rem;
@@ -544,48 +529,11 @@ body {
   cursor: pointer;
   user-select: none;
 }
-.card-action:hover {
-  background: var(--paper);
-  color: var(--ink);
-  border-color: var(--paper);
-}
-
-/* Map action — rust tint */
-.card-action--map {
-  border-color: rgba(124, 51, 23, 0.7);
-  color: rgba(240, 235, 224, 0.85);
-}
-.card-action--map:hover {
-  background: var(--rust);
-  color: var(--paper);
-  border-color: var(--rust);
-}
-
-/* Hidden when no coords yet */
+.card-action:hover { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+.card-action--map { border-color: rgba(124,51,23,0.7); color: rgba(240,235,224,0.85); }
+.card-action--map:hover { background: var(--rust); color: var(--paper); border-color: var(--rust); }
 .card-action--hidden { display: none; }
-
-/* Mobile: shrink text and padding so both buttons fit in narrow cards */
-@media (max-width: 600px) {
-  .card-action {
-    font-size: 0.48rem;
-    letter-spacing: 0.06em;
-    padding: 5px 8px;
-    border-color: rgba(240,235,224,0.65);
-    background: rgba(22,18,12,0.5);
-    flex: 1;
-    text-align: center;
-  }
-  .card-action--map {
-    border-color: rgba(124,51,23,0.75);
-    background: rgba(124,51,23,0.5);
-    flex: 0 0 auto;
-  }
-  .card-action--detail:only-child,
-  .card-action--map.card-action--hidden ~ .card-action--detail {
-    flex: 1;
-  }
-}
-
+.card-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .card-body { padding: 14px 16px 18px; }
 .card-title { font-family: var(--font-display); font-size: 1rem; font-weight: 400; margin-bottom: 4px; }
 .card-loc   { font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 2px; }
@@ -699,13 +647,7 @@ body {
 .collector-addr       { font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-2); }
 .collector-count { font-family: var(--font-display); font-size: 1.1rem; color: var(--rust); }
 .col-works { vertical-align: top; min-width: 200px; }
-.works-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  align-items: center;
-  padding-top: 2px;
-}
+.works-list { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; padding-top: 2px; }
 .work-pill {
   display: inline-block;
   font-family: var(--font-mono);
@@ -955,6 +897,41 @@ footer {
 .col-rank { width: 32px; color: var(--ink-3); font-family: var(--font-mono); font-size: 0.7rem; }
 .col-count { width: 60px; }
 
+
+/* ── Header right group ── */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* ── Hamburger button — hidden on desktop ── */
+.nav-hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 36px;
+  height: 36px;
+  background: none;
+  border: 1px solid var(--line-strong);
+  cursor: pointer;
+  padding: 7px 8px;
+  flex-shrink: 0;
+}
+.nav-hamburger span {
+  display: block;
+  width: 100%;
+  height: 1.5px;
+  background: var(--ink);
+  transition: transform 0.22s ease, opacity 0.22s ease;
+  transform-origin: center;
+}
+.nav-hamburger.open span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
+.nav-hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+.nav-hamburger.open span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+
 /* ═══════════════════════════════════════════════════════════════════════════
    RESPONSIVE — TABLET (≤ 900px)
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -1001,51 +978,18 @@ footer {
 /* ═══════════════════════════════════════════════════════════════════════════
    RESPONSIVE — MOBILE (≤ 600px)
    ═══════════════════════════════════════════════════════════════════════════ */
-/* ── Hamburger button — hidden on desktop ── */
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-.nav-hamburger {
-  display: none;
-  flex-direction: column;
-  justify-content: center;
-  gap: 5px;
-  width: 36px;
-  height: 36px;
-  background: none;
-  border: 1px solid var(--line-strong);
-  cursor: pointer;
-  padding: 7px 8px;
-  flex-shrink: 0;
-}
-.nav-hamburger span {
-  display: block;
-  width: 100%;
-  height: 1.5px;
-  background: var(--ink);
-  transition: transform 0.22s ease, opacity 0.22s ease;
-  transform-origin: center;
-}
-/* Open state — morphs into × */
-.nav-hamburger.open span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
-.nav-hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
-.nav-hamburger.open span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
-
-/* ── Mobile drawer ── */
 @media (max-width: 600px) {
   :root { --header-h: 52px; }
 
+  /* Header */
   .site-header { padding: 0 16px; }
   .site-logo { font-size: 0.88rem; }
   #wallet-btn { padding: 6px 10px; font-size: 0.55rem; }
 
+  /* Hamburger */
   .nav-hamburger { display: flex; }
 
-  /* Nav becomes a full-width dropdown drawer */
+  /* Nav drawer */
   #main-nav {
     position: fixed;
     top: var(--header-h);
@@ -1057,11 +1001,7 @@ footer {
     transition: transform 0.25s ease;
     pointer-events: none;
   }
-  #main-nav.open {
-    transform: translateY(0);
-    pointer-events: auto;
-  }
-
+  #main-nav.open { transform: translateY(0); pointer-events: auto; }
   .nav-links {
     display: flex;
     flex-direction: column;
@@ -1071,16 +1011,34 @@ footer {
   }
   .nav-links li { border-bottom: 1px solid var(--line); }
   .nav-links li:last-child { border-bottom: none; }
-  .nav-links a {
-    display: block;
-    padding: 14px 20px;
-    font-size: 0.72rem;
-    letter-spacing: 0.1em;
-    color: var(--ink-2);
+  .nav-links a { display: block; padding: 14px 20px; font-size: 0.72rem; letter-spacing: 0.1em; color: var(--ink-2); }
+  .nav-links a:hover, .nav-links a:active { background: var(--paper-2); color: var(--ink); }
+
+  /* Mobile card overlay — persistent gradient strip at bottom */
+  .card-overlay {
+    opacity: 1;
+    pointer-events: auto;
+    background: linear-gradient(to top, rgba(22,18,12,0.78) 0%, rgba(22,18,12,0) 52%);
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 0 8px 8px;
+    gap: 6px;
   }
-  .nav-links a:hover,
-  .nav-links a:active { background: var(--paper-2); color: var(--ink); }
-}
+  .card-action {
+    font-size: 0.48rem;
+    letter-spacing: 0.06em;
+    padding: 5px 8px;
+    border-color: rgba(240,235,224,0.65);
+    background: rgba(22,18,12,0.5);
+    flex: 1;
+    text-align: center;
+  }
+  .card-action--map {
+    border-color: rgba(124,51,23,0.75);
+    background: rgba(124,51,23,0.5);
+    flex: 0 0 auto;
+  }
 
   /* Hero */
   .hero { padding: 0 0 24px; }
