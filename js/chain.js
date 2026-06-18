@@ -244,6 +244,9 @@ async function loadAllTokens() {
       price:    null,
       availabilityText: "",
       availabilityKind: "",
+      streetView: !!known?.streetView,
+      placePhotos: !!known?.placePhotos,
+      photoQuery: known?.photoQuery || known?.loc || "",
       // From chain attributes (if Tucker adds them later)
       lat:      isNaN(latAttr) ? known?.lat ?? null : latAttr,
       lng:      isNaN(lngAttr) ? known?.lng ?? null : lngAttr,
