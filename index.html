@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tucker — A Life Drawn in Places</title>
-  <meta name="description" content="Field sketches by Tucker — ink drawings of places across America, collected on Tezos.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Steve Tucker — A Life Drawn in Places</title>
+  <meta name="description" content="Field sketches by Steve Tucker — ink drawings of places across America, collected on Tezos.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Instrument+Sans:wght@400;500;600&family=Martian+Mono:wght@300;400&display=swap" rel="stylesheet">
@@ -13,10 +13,12 @@
 </head>
 <body>
 
+  <!-- HEADER -->
   <header class="site-header">
-    <a class="site-logo" href="#">Tucker <em>Sketchbook</em></a>
+    <a class="site-logo" href="#">Steve Tucker <em>Sketchbook</em></a>
     <nav>
       <ul class="nav-links">
+        <li><a href="#about-section">Story</a></li>
         <li><a href="#map-section">Map</a></li>
         <li><a href="#gallery-section">Gallery</a></li>
         <li><a href="#collectors-section">Collectors</a></li>
@@ -26,39 +28,103 @@
     <button id="wallet-btn" aria-label="Connect Tezos wallet">Connect Wallet</button>
   </header>
 
+  <!-- HERO -->
   <section class="hero">
     <div class="hero-left">
-      <p class="hero-kicker">Field Sketches · Tezos · Self-sustaining</p>
+      <p class="hero-kicker">Field Sketches · Tezos · Live from the blockchain</p>
       <h1 class="hero-h1">A life<br>drawn<br>in <em>places.</em></h1>
       <p class="hero-body">
-        Tucker has spent decades stopping wherever the world looked interesting
-        and drawing it — in ink, on paper, in the moment. He writes the place
-        and date on every sketch. This site reads them.
+        Steve Tucker is 83. He's spent a lifetime stopping wherever the world
+        looked interesting and drawing it — in ink, on paper, in the moment.
+        He writes the place and date on every sketch. This site reads them.
       </p>
       <div class="hero-stats">
-        <span class="stat-num" id="sketch-count">—</span>
-        <span class="stat-label">sketches on-chain</span>
+        <div class="hero-stat">
+          <span class="stat-num" id="sketch-count">—</span>
+          <span class="stat-label">Sketches on-chain</span>
+        </div>
+        <div class="hero-stat">
+          <span class="stat-num">83</span>
+          <span class="stat-label">Years of life</span>
+        </div>
+        <div class="hero-stat">
+          <span class="stat-num">2009–</span>
+          <span class="stat-label">Still drawing</span>
+        </div>
       </div>
     </div>
     <div class="hero-right">
-      <img src="images/s5.jpg" alt="Twelvemile Beach campsite — Tucker 2012">
+      <img src="images/s5.jpg" alt="Twelvemile Beach campsite — Steve Tucker 2012">
     </div>
   </section>
 
+  <!-- ABOUT / TWEET -->
+  <section id="about-section" class="about-section">
+    <div class="section-head">
+      <p class="section-eyebrow">The story</p>
+      <h2 class="section-h2">Meet Steve</h2>
+      <p class="section-sub">Over a million people heard about him this week.</p>
+    </div>
+    <div class="about-layout">
+      <div class="about-text">
+        <p class="about-body">
+          Steve Tucker is 83 years old. His wife passed away a few months ago.
+          He visits Spring Mill Lodge in Indiana and draws. He taught art in Terre Haute
+          his whole life, did courtroom sketches for court cases, and has been recording
+          the world around him in ink for decades.
+        </p>
+        <p class="about-body">
+          A stranger named Sneketoshi found him at the lodge, photographed his sketchbooks,
+          and shared them on X. The thread went viral — over a million views. The Tezos
+          community stepped in to put Steve's work on-chain, so it lives forever.
+        </p>
+        <a class="about-link" href="https://x.com/Sneketoshi/status/2065910638950395918" target="_blank" rel="noopener">
+          Read the full thread on X ↗
+        </a>
+      </div>
+      <div class="about-tweet">
+        <!-- Twitter oEmbed loads here. Static fallback shown immediately. -->
+        <div class="tweet-card" id="tweet-card">
+          <div class="tweet-header">
+            <div class="tweet-avatar">S</div>
+            <div class="tweet-meta">
+              <span class="tweet-name">Sneketoshi</span>
+              <span class="tweet-handle">@Sneketoshi</span>
+            </div>
+            <a class="tweet-x-logo" href="https://x.com/Sneketoshi/status/2065910638950395918" target="_blank" rel="noopener" aria-label="View on X">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </a>
+          </div>
+          <p class="tweet-body">
+            "I want to introduce you to Steve. He's 83. His wife died a few months ago and he comes to this lodge in Spring Mill, Indiana and draws. He taught art in Terre Haute, IN his whole life. He also did courtroom sketches in court cases."
+          </p>
+          <div class="tweet-footer">
+            <span class="tweet-stat">1M+ views</span>
+            <a class="tweet-cta" href="https://x.com/Sneketoshi/status/2065910638950395918" target="_blank" rel="noopener">Read thread →</a>
+          </div>
+        </div>
+        <!-- Official embed loads asynchronously and replaces the card if successful -->
+        <div id="tweet-embed" style="display:none"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MAP -->
   <section id="map-section">
     <div class="section-head">
       <p class="section-eyebrow">Where he drew</p>
       <h2 class="section-h2">Every pin, a moment in ink</h2>
-      <p class="section-sub">Locations are read directly from the handwriting on each sketch. Pins appear as they're resolved.</p>
+      <p class="section-sub">Hover a pin to see the sketch. Click to open.</p>
     </div>
     <div id="map" role="application" aria-label="Map of sketch locations"></div>
   </section>
 
+  <!-- GALLERY -->
   <section id="gallery-section">
     <div class="section-head">
       <p class="section-eyebrow">The drawings</p>
       <h2 class="section-h2">All field sketches</h2>
-      <p class="section-sub">Loaded from the Tezos blockchain. Tucker mints, the site updates.</p>
+      <p class="section-sub">Loaded live from the Tezos blockchain. Steve mints, the site updates.</p>
     </div>
     <div id="my-collection">
       <p class="my-col-head">Your Collection</p>
@@ -68,6 +134,7 @@
     <div class="gallery-grid" id="gallery"></div>
   </section>
 
+  <!-- COLLECTORS -->
   <section id="collectors-section">
     <div class="section-head">
       <p class="section-eyebrow">On-chain</p>
@@ -79,17 +146,23 @@
     </div>
   </section>
 
+  <!-- LIGHTBOX -->
   <div id="lightbox" class="lightbox" role="dialog" aria-modal="true">
     <button class="lb-close" id="lb-close" aria-label="Close">✕</button>
     <div class="lb-inner">
-      <img class="lb-img" id="lb-img" src="" alt="" tabindex="0">
+      <div class="lb-img-wrap">
+        <img class="lb-img" id="lb-img" src="" alt="" tabindex="0">
+      </div>
       <div class="lb-info">
-        <p class="lb-eyebrow">Tucker · Field Sketch</p>
+        <p class="lb-eyebrow">Steve Tucker · Field Sketch</p>
         <h2 class="lb-title" id="lb-title"></h2>
         <p class="lb-subtitle" id="lb-subtitle"></p>
         <p class="lb-date" id="lb-date"></p>
         <p class="lb-supply" id="lb-supply"></p>
-        <a id="lb-objkt" class="lb-objkt-link" href="#" target="_blank" rel="noopener">View on objkt ↗</a>
+        <div class="lb-actions">
+          <a id="lb-collect" class="lb-btn" href="#" target="_blank" rel="noopener">View on objkt ↗</a>
+          <button id="lb-locate" class="lb-btn lb-btn--locate">Locate on map ⌖</button>
+        </div>
         <div class="lb-nav">
           <button id="lb-prev">← Prev</button>
           <button id="lb-next">Next →</button>
@@ -98,8 +171,9 @@
     </div>
   </div>
 
+  <!-- FOOTER -->
   <footer>
-    <span class="footer-sig">Tucker</span>
+    <span class="footer-sig">Steve Tucker</span>
     <span>Field sketches · 2009–ongoing</span>
     <a href="https://objkt.com/tokens/KT1V35dHCUUpXT9ZUbCY58KbWJzkgEpeE5E9/19"
        target="_blank" rel="noopener" style="color:inherit;text-decoration:none;">objkt ↗</a>
@@ -109,8 +183,38 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="https://unpkg.com/@airgap/beacon-dapp@4.2.0/dist/beacon-dapp.umd.js"></script>
   <script src="js/data.js"></script>
+  <script src="js/profiles.js"></script>
   <script src="js/chain.js"></script>
   <script src="js/app.js"></script>
   <script src="js/wallet.js"></script>
+
+  <!-- Load official tweet embed asynchronously — replaces fallback card if it works -->
+  <script>
+    (function() {
+      var TWEET_URL = "https://x.com/Sneketoshi/status/2065910638950395918";
+      fetch("https://publish.twitter.com/oembed?url=" + encodeURIComponent(TWEET_URL) + "&omit_script=false&dnt=true")
+        .then(r => r.json())
+        .then(data => {
+          var embed = document.getElementById("tweet-embed");
+          var card  = document.getElementById("tweet-card");
+          if (!embed || !data.html) return;
+          embed.innerHTML = data.html;
+          embed.style.display = "";
+          if (card) card.style.display = "none";
+          // Load the twitter widgets script if not already present
+          if (!window.twttr) {
+            var s = document.createElement("script");
+            s.src = "https://platform.twitter.com/widgets.js";
+            s.async = true;
+            document.body.appendChild(s);
+          } else if (window.twttr.widgets) {
+            window.twttr.widgets.load(embed);
+          }
+        })
+        .catch(function() {
+          // Fallback card already visible — nothing to do
+        });
+    })();
+  </script>
 </body>
 </html>
