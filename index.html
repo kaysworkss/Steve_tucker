@@ -28,6 +28,18 @@
     <button id="wallet-btn" aria-label="Connect Tezos wallet">Connect Wallet</button>
   </header>
 
+  <div class="wallet-modal" id="tezos-wallet-modal" role="dialog" aria-modal="true" aria-labelledby="tezos-wallet-title">
+    <div class="wallet-box">
+      <button type="button" class="wallet-close" id="wallet-dismiss" aria-label="Close">✕</button>
+      <p class="wallet-eyebrow">Tezos wallet</p>
+      <h2 id="tezos-wallet-title">Connect your wallet</h2>
+      <p class="wallet-copy">Use Beacon on phones for Temple, Kukai, Umami, Naan, AirGap, and other Tezos wallets. On desktop, Temple Direct works with the Temple browser extension.</p>
+      <button type="button" class="wallet-option primary" id="wallet-beacon-btn">Mobile Wallet / Beacon</button>
+      <button type="button" class="wallet-option" id="wallet-temple-btn">Temple Direct (Desktop)</button>
+      <a class="wallet-option link" href="https://templewallet.com/download" target="_blank" rel="noopener">Install Temple Wallet</a>
+    </div>
+  </div>
+
   <!-- HERO -->
   <section class="hero">
     <div class="hero-left">
