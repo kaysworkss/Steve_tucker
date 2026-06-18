@@ -386,7 +386,8 @@ body {
 .collectors-table tr:last-child td { border-bottom: none; }
 .collectors-table tr:hover td { background: var(--paper-2); }
 .collector-row.is-me td { background: rgba(74,102,80,0.08); }
-.collector-row.is-me .collector-addr { color: var(--sage); }
+.collector-row.is-me .collector-name { color: var(--sage); }
+.col-addr { display: flex; align-items: center; gap: 8px; }
 .collector-identity { display: flex; flex-direction: column; gap: 2px; }
 .collector-name { font-weight: 500; font-size: 0.88rem; color: var(--ink); }
 .collector-addr-short { font-family: var(--font-mono); font-size: 0.6rem; color: var(--ink-3); }
