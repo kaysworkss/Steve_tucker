@@ -700,25 +700,18 @@ body {
 .collector-addr-short { font-family: var(--font-mono); font-size: 0.6rem; color: var(--ink-3); }
 .collector-addr       { font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-2); }
 .collector-count { font-family: var(--font-display); font-size: 1.1rem; color: var(--rust); }
-.col-editions {
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  color: var(--ink-3);
-  letter-spacing: 0.04em;
-  margin-left: 4px;
-  vertical-align: middle;
-}
-.col-works { vertical-align: top; max-width: 360px; }
+.col-works { vertical-align: top; min-width: 200px; }
 .works-list {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  align-items: baseline;
+  align-items: center;
+  padding-top: 2px;
 }
 .work-pill {
   display: inline-block;
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: 0.58rem;
   letter-spacing: 0.04em;
   color: var(--ink-2);
   background: var(--paper-2);
@@ -728,7 +721,6 @@ body {
 }
 .works-extra { display: contents; }
 .works-toggle {
-  display: inline-block;
   font-family: var(--font-mono);
   font-size: 0.58rem;
   letter-spacing: 0.06em;
@@ -739,6 +731,7 @@ body {
   padding: 3px 2px;
   text-decoration: underline;
   text-underline-offset: 2px;
+  white-space: nowrap;
 }
 .works-toggle:hover { color: var(--ink); }
 .collector-links { display: inline-flex; gap: 8px; margin-left: 8px; }
@@ -963,7 +956,6 @@ footer {
 /* ─── COLLECTOR identity extras ───────────────────────────────────────────── */
 .col-rank { width: 32px; color: var(--ink-3); font-family: var(--font-mono); font-size: 0.7rem; }
 .col-count { width: 60px; }
-.col-works { color: var(--ink-3); font-style: italic; font-size: 0.82rem; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    RESPONSIVE — TABLET (≤ 900px)
