@@ -513,10 +513,18 @@ async function renderCollectors() {
     for (const b of balances) {
       const addr = b.account.address;
       if (addr === BURN_ADDRESS || MARKET_CONTRACTS.has(addr)) continue;
-      if (!byAddr[addr]) byAddr[addr] = { total: 0, tokenIds: [], name: ACCOUNT_NAMES[addr] || b.account.alias || "" };
+      if (!byAddr[addr]) byAddr[addr] = {
+        editions: 0,       // total editions held
+        works: {},         // tokenId → { name, qty }
+        name: ACCOUNT_NAMES[addr] || b.account.alias || "",
+      };
       if (b.account.alias && !byAddr[addr].name) byAddr[addr].name = b.account.alias;
-      byAddr[addr].total += Number(b.balance);
-      byAddr[addr].tokenIds.push(b.token.tokenId);
+      const qty = Number(b.balance);
+      byAddr[addr].editions += qty;
+      const tid  = b.token.tokenId;
+      const name = TOKENS.find(t => t.tokenId == tid)?.name || `#${tid}`;
+      if (!byAddr[addr].works[tid]) byAddr[addr].works[tid] = { name, qty: 0 };
+      byAddr[addr].works[tid].qty += qty;
     }
 
     await hydrateAccountNames(Object.keys(byAddr));
@@ -524,7 +532,14 @@ async function renderCollectors() {
       info.name = ACCOUNT_NAMES[addr] || info.name;
     }
 
-    const entries = Object.entries(byAddr).sort((a, b) => b[1].total - a[1].total);
+    // Sort by unique works count descending
+    const entries = Object.entries(byAddr).sort((a, b) => {
+      const wa = Object.keys(a[1].works).length;
+      const wb = Object.keys(b[1].works).length;
+      if (wb !== wa) return wb - wa;
+      return b[1].editions - a[1].editions; // tiebreak by total editions
+    });
+
     const totalEl = document.getElementById("collectors-total");
     if (totalEl) totalEl.textContent = `${entries.length} collector${entries.length !== 1 ? "s" : ""}`;
 
@@ -534,12 +549,29 @@ async function renderCollectors() {
     }
 
     const rows = entries.map(([addr, info], i) => {
-      const short = shortAddress(addr);
+      const short       = shortAddress(addr);
       const displayName = info.name || short;
-      const addrLine = info.name ? short : "";
-      const works = info.tokenIds
-        .map(tid => TOKENS.find(t => t.tokenId == tid)?.name || `#${tid}`)
-        .filter((v, j, a) => a.indexOf(v) === j).slice(0, 3).join(", ");
+      const addrLine    = info.name ? short : "";
+      const uniqueWorks = Object.keys(info.works).length;
+      const editionsStr = info.editions !== uniqueWorks
+        ? ` <span class="col-editions">(${info.editions} ed.)</span>` : "";
+
+      // Works list — first two shown inline, rest collapsible
+      const workEntries = Object.values(info.works);
+      const rowId = `works-${addr.slice(-8)}`;
+      const firstTwo = workEntries.slice(0, 2).map(w =>
+        `<span class="work-pill">${w.name}${w.qty > 1 ? ` ×${w.qty}` : ""}</span>`
+      ).join("");
+      const rest = workEntries.slice(2).map(w =>
+        `<span class="work-pill">${w.name}${w.qty > 1 ? ` ×${w.qty}` : ""}</span>`
+      ).join("");
+      const moreBtn = rest
+        ? `<button class="works-toggle" aria-expanded="false" aria-controls="${rowId}"
+              onclick="toggleWorks(this,'${rowId}')">+${workEntries.length - 2} more</button>`
+        : "";
+      const hiddenWorks = rest
+        ? `<span class="works-extra" id="${rowId}" hidden>${rest}</span>` : "";
+
       return `<tr class="collector-row" data-addr="${addr}">
         <td class="col-rank">${i + 1}</td>
         <td class="col-addr">
@@ -552,16 +584,28 @@ async function renderCollectors() {
             <a href="https://objkt.com/profile/${addr}/collected" target="_blank" rel="noopener">objkt ↗</a>
           </span>
         </td>
-        <td class="col-count"><span class="collector-count">${info.total}</span></td>
-        <td class="col-works">${works || "—"}</td>
+        <td class="col-count">
+          <span class="collector-count">${uniqueWorks}</span>${editionsStr}
+        </td>
+        <td class="col-works">
+          <div class="works-list">
+            ${firstTwo}${moreBtn}${hiddenWorks}
+          </div>
+        </td>
       </tr>`;
     }).join("");
 
     wrap.innerHTML = `
       <table class="collectors-table">
-        <thead><tr><th>#</th><th>Collector</th><th>Held</th><th>Works</th></tr></thead>
+        <thead><tr>
+          <th>#</th>
+          <th>Collector</th>
+          <th title="Unique works · total editions">Works</th>
+          <th>Titles</th>
+        </tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
+
     const activeWallet = window.ACTIVE_TUCKER_WALLET || "";
     if (activeWallet) {
       document.querySelectorAll(".collector-row").forEach(r =>
@@ -572,6 +616,17 @@ async function renderCollectors() {
     wrap.innerHTML = `<p class="collectors-empty">Could not reach the blockchain. Reload to try again.</p>`;
   }
 }
+
+window.toggleWorks = function(btn, id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const open = btn.getAttribute("aria-expanded") === "true";
+  el.hidden = open;
+  btn.setAttribute("aria-expanded", String(!open));
+  btn.textContent = open
+    ? `+${el.querySelectorAll(".work-pill").length} more`
+    : "Show less";
+};
 
 async function markWalletOwned(address) {
   try {

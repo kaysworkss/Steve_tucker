@@ -207,7 +207,7 @@ function addCard(token, i) {
            onerror="this.parentElement.style.background='var(--paper-3)'">
       <div class="card-overlay">
         <span class="card-action card-action--detail">View details</span>
-        <span class="card-action card-action--map${hasPin ? "" : " card-action--hidden"}" data-map-action>View on map</span>
+        <span class="card-action card-action--map${hasPin ? "" : " card-action--hidden"}" data-map-action>⌖ Map</span>
       </div>
     </div>
     <div class="card-body">
@@ -643,3 +643,40 @@ function showToast(message) {
   requestAnimationFrame(() => t.classList.add("toast-show"));
   setTimeout(() => { t.classList.remove("toast-show"); setTimeout(() => t.remove(), 400); }, 4000);
 }
+
+// ── Hamburger menu ────────────────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", () => {
+  const hamburger = document.getElementById("nav-hamburger");
+  const nav       = document.getElementById("main-nav");
+  if (!hamburger || !nav) return;
+
+  function toggleMenu(open) {
+    hamburger.classList.toggle("open", open);
+    nav.classList.toggle("open", open);
+    hamburger.setAttribute("aria-expanded", String(open));
+    document.body.style.overflow = open ? "hidden" : "";
+  }
+
+  hamburger.addEventListener("click", () => {
+    toggleMenu(!nav.classList.contains("open"));
+  });
+
+  // Close when a nav link is tapped
+  nav.querySelectorAll("a").forEach(link => {
+    link.addEventListener("click", () => toggleMenu(false));
+  });
+
+  // Close on outside tap
+  document.addEventListener("click", e => {
+    if (nav.classList.contains("open") &&
+        !nav.contains(e.target) &&
+        !hamburger.contains(e.target)) {
+      toggleMenu(false);
+    }
+  });
+
+  // Close on Escape
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && nav.classList.contains("open")) toggleMenu(false);
+  });
+});
