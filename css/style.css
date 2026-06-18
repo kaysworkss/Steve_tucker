@@ -102,8 +102,9 @@ body {
   position: absolute; inset: 0;
   background-image: repeating-linear-gradient(180deg,transparent 0px,transparent 29px,var(--line) 29px,var(--line) 30px);
   pointer-events: none;
+  z-index: 0;
 }
-.hero-left { padding-bottom: 4vh; }
+.hero-left { padding-bottom: 4vh; position: relative; z-index: 1; }
 .hero-kicker {
   font-family: var(--font-mono);
   font-size: 0.6rem;
@@ -154,19 +155,33 @@ body {
 .hero-right {
   align-self: stretch;
   border-left: 1px solid var(--line-strong);
-  overflow: hidden;
+  overflow: visible;
   position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(18px, 3vw, 38px);
 }
 .hero-right img {
-  width: 100%; height: 100%;
+  width: min(92%, 680px);
+  height: min(92%, 720px);
   object-fit: cover;
   display: block;
   opacity: 0.88;
   mix-blend-mode: multiply;
+  transform: rotate(-2.4deg);
+  box-shadow: 0 18px 42px rgba(22,18,12,0.18);
+  border: 10px solid rgba(240,235,224,0.9);
+  background: var(--paper);
 }
 
 /* ─── SECTION COMMON ──────────────────────────────────────────────────────── */
 .section-head { padding: 56px 5vw 0; }
+.about-section .section-head {
+  max-width: 1120px;
+  margin: 0 auto;
+}
 .section-eyebrow {
   font-family: var(--font-mono);
   font-size: 0.6rem;
@@ -198,12 +213,28 @@ body {
 }
 .about-layout {
   display: grid;
-  grid-template-columns: minmax(360px, 0.95fr) minmax(320px, 0.85fr);
-  gap: clamp(28px, 5vw, 72px);
+  grid-template-columns: minmax(180px, 0.56fr) minmax(340px, 1fr) minmax(300px, 0.88fr);
+  gap: clamp(24px, 3.5vw, 46px);
   padding: 0 5vw;
-  align-items: start;
-  max-width: 1320px;
+  align-items: center;
+  max-width: 1120px;
+  margin: 0 auto;
 }
+.about-portrait {
+  justify-self: center;
+  width: min(100%, 230px);
+  transform: rotate(1.8deg);
+}
+.about-portrait img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border: 9px solid rgba(240,235,224,0.95);
+  box-shadow: 0 16px 32px rgba(22,18,12,0.16);
+  filter: sepia(8%) saturate(0.92);
+}
+.about-text { justify-self: center; }
 .about-body {
   font-size: 1rem;
   line-height: 1.8;
@@ -232,6 +263,7 @@ body {
   border: 1px solid var(--line-strong);
   padding: 20px;
   max-width: 520px;
+  justify-self: center;
 }
 .tweet-header {
   display: flex;
@@ -341,6 +373,18 @@ body {
   line-height: 1.45;
   color: var(--ink-2);
 }
+.street-link {
+  display: inline-block;
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--rust);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(124,51,23,0.45);
+}
+.street-link:hover { color: var(--ink); border-bottom-color: var(--ink); }
 .card-owned {
   position: absolute; top: 10px; right: 10px;
   background: var(--sage); color: #fff;
@@ -581,7 +625,11 @@ footer {
   }
   .hero-h1 { font-size: clamp(2.4rem, 8vw, 3.6rem); }
 
-  .about-layout { grid-template-columns: 1fr; gap: 32px; }
+  .about-layout {
+    grid-template-columns: minmax(160px, 220px) minmax(0, 1fr);
+    gap: 32px;
+  }
+  .about-tweet { grid-column: 1 / -1; justify-self: center; width: min(100%, 620px); }
   .tweet-card { max-width: 100%; }
 
   #map { height: 360px; }
@@ -629,7 +677,8 @@ footer {
   .section-h2 { font-size: 1.5rem; }
 
   /* About */
-  .about-layout { padding: 0 5vw; gap: 24px; }
+  .about-layout { grid-template-columns: 1fr; padding: 0 5vw; gap: 24px; text-align: left; }
+  .about-portrait { width: min(72vw, 220px); }
   .about-body { font-size: 0.92rem; }
 
   /* Map — taller on mobile so it's usable */
