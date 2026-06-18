@@ -49,6 +49,10 @@ function shortAddress(address) {
   return address ? address.slice(0, 7) + "…" + address.slice(-5) : "";
 }
 
+function editionLabel(count) {
+  return `${count} edition${count === 1 ? "" : "s"}`;
+}
+
 function accountDisplayName(accountOrAddress) {
   const address = typeof accountOrAddress === "string" ? accountOrAddress : accountOrAddress?.address;
   if (!address) return "";
@@ -382,12 +386,18 @@ async function fetchAvailability() {
 
     t.price = null;
     t.collectors = collectorEntries;
-    if (t.supply > 1) {
+    t.burned = burnBalance;
+    t.liveSupply = Math.max(0, Number(t.supply || 0) - burnBalance);
+    t.displaySupply = t.liveSupply || Number(t.supply || 0);
+
+    if (t.displaySupply > 1) {
       t.listed = creatorBalance;
       t.soldOut = creatorBalance === 0;
       t.availabilityKind = creatorBalance > 0 ? "open" : "sold";
       t.availabilityText = creatorBalance > 0
-        ? `${creatorBalance} of ${t.supply} editions left`
+        ? `${creatorBalance} of ${editionLabel(t.displaySupply)} left`
+        : burnBalance > 0
+        ? `Sold out · ${editionLabel(t.displaySupply)} live`
         : "Sold out";
     } else if (marketBalance > 0) {
       t.listed = marketBalance;
