@@ -517,17 +517,17 @@ body {
   pointer-events: auto;
 }
 
-/* On coarse-pointer (touch) devices, show overlay permanently at reduced opacity */
+/* On coarse-pointer (touch) devices, show overlay as bottom gradient strip */
 @media (pointer: coarse) {
   .card-overlay {
     opacity: 1;
     pointer-events: auto;
-    background: linear-gradient(to top, rgba(22,18,12,0.72) 0%, rgba(22,18,12,0) 55%);
+    background: linear-gradient(to top, rgba(22,18,12,0.78) 0%, rgba(22,18,12,0) 52%);
     flex-direction: row;
     align-items: flex-end;
-    justify-content: flex-start;
-    padding: 0 10px 10px;
-    gap: 8px;
+    justify-content: space-between;
+    padding: 0 8px 8px;
+    gap: 6px;
   }
 }
 
@@ -550,7 +550,7 @@ body {
   border-color: var(--paper);
 }
 
-/* Map action — rust tint so it reads differently from "view details" */
+/* Map action — rust tint */
 .card-action--map {
   border-color: rgba(124, 51, 23, 0.7);
   color: rgba(240, 235, 224, 0.85);
@@ -561,20 +561,30 @@ body {
   border-color: var(--rust);
 }
 
-/* Hidden when no coords yet — shown once pin is placed */
+/* Hidden when no coords yet */
 .card-action--hidden { display: none; }
 
-/* Mobile: smaller pill style at bottom of image */
+/* Mobile: shrink text and padding so both buttons fit in narrow cards */
 @media (pointer: coarse) {
   .card-action {
-    font-size: 0.52rem;
-    padding: 5px 10px;
-    border-color: rgba(240,235,224,0.7);
-    background: rgba(22,18,12,0.55);
+    font-size: 0.48rem;
+    letter-spacing: 0.06em;
+    padding: 5px 8px;
+    border-color: rgba(240,235,224,0.65);
+    background: rgba(22,18,12,0.5);
+    flex: 1;
+    text-align: center;
   }
   .card-action--map {
-    border-color: rgba(124,51,23,0.8);
-    background: rgba(124,51,23,0.55);
+    border-color: rgba(124,51,23,0.75);
+    background: rgba(124,51,23,0.5);
+    flex: 0 0 auto;
+    /* Show just a pin icon on very narrow cards */
+  }
+  /* When only one button visible (no map), stretch it */
+  .card-action--detail:only-child,
+  .card-action--map.card-action--hidden ~ .card-action--detail {
+    flex: 1;
   }
 }
 
@@ -690,6 +700,47 @@ body {
 .collector-addr-short { font-family: var(--font-mono); font-size: 0.6rem; color: var(--ink-3); }
 .collector-addr       { font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-2); }
 .collector-count { font-family: var(--font-display); font-size: 1.1rem; color: var(--rust); }
+.col-editions {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--ink-3);
+  letter-spacing: 0.04em;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.col-works { vertical-align: top; max-width: 360px; }
+.works-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: baseline;
+}
+.work-pill {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+  background: var(--paper-2);
+  border: 1px solid var(--line-strong);
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+.works-extra { display: contents; }
+.works-toggle {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  color: var(--rust);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 3px 2px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.works-toggle:hover { color: var(--ink); }
 .collector-links { display: inline-flex; gap: 8px; margin-left: 8px; }
 .collector-links a { font-family: var(--font-mono); font-size: 0.56rem; color: var(--ink-3); text-decoration: none; }
 .collector-links a:hover { color: var(--rust); }
@@ -960,14 +1011,86 @@ footer {
 /* ═══════════════════════════════════════════════════════════════════════════
    RESPONSIVE — MOBILE (≤ 600px)
    ═══════════════════════════════════════════════════════════════════════════ */
+/* ── Hamburger button — hidden on desktop ── */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.nav-hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 36px;
+  height: 36px;
+  background: none;
+  border: 1px solid var(--line-strong);
+  cursor: pointer;
+  padding: 7px 8px;
+  flex-shrink: 0;
+}
+.nav-hamburger span {
+  display: block;
+  width: 100%;
+  height: 1.5px;
+  background: var(--ink);
+  transition: transform 0.22s ease, opacity 0.22s ease;
+  transform-origin: center;
+}
+/* Open state — morphs into × */
+.nav-hamburger.open span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
+.nav-hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+.nav-hamburger.open span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+
+/* ── Mobile drawer ── */
 @media (max-width: 600px) {
   :root { --header-h: 52px; }
 
-  /* Header — hide nav links, keep logo + wallet */
   .site-header { padding: 0 16px; }
-  .nav-links { display: none; }
   .site-logo { font-size: 0.88rem; }
   #wallet-btn { padding: 6px 10px; font-size: 0.55rem; }
+
+  .nav-hamburger { display: flex; }
+
+  /* Nav becomes a full-width dropdown drawer */
+  #main-nav {
+    position: fixed;
+    top: var(--header-h);
+    left: 0; right: 0;
+    background: var(--paper);
+    border-bottom: 1px solid var(--line-strong);
+    z-index: 199;
+    transform: translateY(-110%);
+    transition: transform 0.25s ease;
+    pointer-events: none;
+  }
+  #main-nav.open {
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .nav-links {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 8px 0 12px;
+  }
+  .nav-links li { border-bottom: 1px solid var(--line); }
+  .nav-links li:last-child { border-bottom: none; }
+  .nav-links a {
+    display: block;
+    padding: 14px 20px;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    color: var(--ink-2);
+  }
+  .nav-links a:hover,
+  .nav-links a:active { background: var(--paper-2); color: var(--ink); }
+}
 
   /* Hero */
   .hero { padding: 0 0 24px; }
