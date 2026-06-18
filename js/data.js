@@ -25,6 +25,38 @@ const LOCAL_IMAGES = {
   "red willow creek":       "images/s0.jpg",
 };
 
+const CREATOR_ADDRESS = "tz1MNyWtbh2BLJZvRq68o4LCaHdRWjETjjwV";
+const BURN_ADDRESS = "tz1burnburnburnburnburnburnburjAYjjX";
+const MARKET_CONTRACTS = new Set([
+  "KT18iSHoRW1iogamADWwQSDoZa3QkN4izkqj", // objkt.com English Auctions
+]);
+const ACCOUNT_NAMES = {
+  [CREATOR_ADDRESS]: "Steve Tucker",
+};
+
+const KNOWN_TOKEN_DETAILS = [
+  { match: "philmont", loc: "Philmont Scout Ranch, Cimarron, NM", lat: 36.5041, lng: -104.9170 },
+  { match: "tahquamenon", loc: "Tahquamenon River, Michigan UP", lat: 46.5596, lng: -85.0310 },
+  { match: "cimarron", loc: "Cimarron, New Mexico", date: "June 7, 2009", lat: 36.5109, lng: -104.9158 },
+  { match: "quiet morning in camp", loc: "Philmont Scout Ranch, Cimarron, NM", lat: 36.5041, lng: -104.9170 },
+  { match: "red willow creek", loc: "Taos Pueblo, New Mexico", date: "July 3, 2009", lat: 36.4386, lng: -105.5444 },
+  { match: "rend lake", loc: "Southern Illinois", lat: 38.0714, lng: -88.9673 },
+  { match: "lady security officer", loc: "United States", lat: 39.8283, lng: -98.5795 },
+  { match: "barking sands", loc: "Polihale State Park, Kauai, HI", date: "August 7, 2011", lat: 22.0797, lng: -159.7596 },
+  { match: "old kaloa", loc: "Old Koloa Town, Kauai, HI", lat: 21.9069, lng: -159.4694 },
+  { match: "old koloa", loc: "Old Koloa Town, Kauai, HI", lat: 21.9069, lng: -159.4694 },
+  { match: "hanalei", loc: "Hanalei, Kauai, HI", lat: 22.2034, lng: -159.4971 },
+  { match: "glass beach", loc: "Glass Beach, Port Allen, Kauai, HI", lat: 21.9024, lng: -159.5904 },
+  { match: "koloa landing", loc: "Koloa Landing, Kauai, HI", lat: 21.8779, lng: -159.4736 },
+  { match: "pictured rocks", loc: "Pictured Rocks National Lakeshore, Michigan", lat: 46.5618, lng: -86.3168 },
+  { match: "skylift", loc: "Natural Bridge State Resort Park, Slade, KY", lat: 37.7781, lng: -83.6851 },
+  { match: "north shore campers", loc: "Kauai, Hawaii", date: "August 4, 2011", lat: 22.2093, lng: -159.4686 },
+  { match: "nature's line art", loc: "Indiana", lat: 39.7684, lng: -86.1581 },
+  { match: "wind-blown tree", loc: "Kealia Beach, Kauai, HI", lat: 22.0979, lng: -159.3073 },
+  { match: "taos pueblo", loc: "Taos Pueblo, New Mexico", lat: 36.4386, lng: -105.5444 },
+  { match: "quiet creek", loc: "Taos Pueblo, New Mexico", lat: 36.4386, lng: -105.5444 },
+];
+
 // Runtime — populated by chain.js on every page load
 let TOKENS = [];
 

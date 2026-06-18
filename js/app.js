@@ -1,4 +1,4 @@
-// ─── APP.JS ───────────────────────────────────────────────────────────────────
+﻿// ─── APP.JS ───────────────────────────────────────────────────────────────────
 
 let mapInstance, markersLayer;
 let currentIdx = 0;
@@ -26,22 +26,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  // Fetch availability in background — updates cards when ready
-  fetchAvailability().then(() => {
-    document.querySelectorAll(".sketch-card").forEach(card => {
-      const tid   = parseInt(card.dataset.tokenId);
-      const token = TOKENS.find(t => t.tokenId === tid);
-      if (token) updateCardAvailability(card, token);
-    });
-  });
-
   if (counter) counter.textContent = TOKENS.length;
   grid.innerHTML = "";
   TOKENS.forEach((t, i) => addCard(t, i));
 
+  // Fetch availability in background after cards exist, then update badges.
+  fetchAvailability().then(() => {
+    document.querySelectorAll(".sketch-card").forEach(card => {
+      const tid   = String(card.dataset.tokenId);
+      const token = TOKENS.find(t => String(t.tokenId) === tid);
+      if (token) updateCardAvailability(card, token);
+    });
+  });
+
   // setupLightbox BEFORE applyCoords so openLightbox is defined when pins are clicked
   setupLightbox();
   await applyCoords(token => addPin(token));
+  fitMapToPins();
   renderCollectors();
 
   startLiveUpdates(newToken => {
@@ -57,13 +58,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 // ── Availability ──────────────────────────────────────────────────────────────
 function availabilityBadge(token) {
   if (token.listed === null) return "";
-  if (token.listed > 0) {
-    const edLabel = token.supply === 1 ? "1 of 1" : `${token.listed} of ${token.supply} left`;
-    const price   = token.price ? ` · ${token.price.toFixed(2)} ꜩ` : "";
-    return `<span class="avail-badge avail-open"><span class="avail-dot"></span>${edLabel}${price}</span>`;
+  const text = token.availabilityText || (token.soldOut ? "Sold out" : "View on objkt");
+  if (token.availabilityKind === "open" || token.availabilityKind === "auction") {
+    return `<span class="avail-badge avail-open"><span class="avail-dot"></span>${text}</span>`;
   }
-  if (token.soldOut) return `<span class="avail-badge avail-sold">Sold out</span>`;
-  return `<span class="avail-badge avail-unlisted">Not listed</span>`;
+  if (token.soldOut) return `<span class="avail-badge avail-sold">${text}</span>`;
+  return `<span class="avail-badge avail-unlisted">${text}</span>`;
 }
 
 function updateCardAvailability(card, token) {
@@ -73,17 +73,15 @@ function updateCardAvailability(card, token) {
 
   const div = document.createElement("div");
   div.className = "card-avail";
-
   const badge = availabilityBadge(token);
 
-  if (token.listed > 0) {
-    // Collect link — stopPropagation so it doesn't fire openLightbox
+  if (token.availabilityKind === "open" || token.availabilityKind === "auction") {
     const a = document.createElement("a");
     a.className = "collect-btn";
     a.href = token.objktUrl;
     a.target = "_blank";
     a.rel = "noopener";
-    a.textContent = `Collect · ${token.price?.toFixed(2)} ꜩ`;
+    a.textContent = token.availabilityKind === "auction" ? "View auction" : "View on objkt";
     a.addEventListener("click", e => e.stopPropagation());
     div.innerHTML = badge;
     div.appendChild(a);
@@ -93,7 +91,6 @@ function updateCardAvailability(card, token) {
 
   card.querySelector(".card-body").appendChild(div);
 }
-
 // ── Gallery card ──────────────────────────────────────────────────────────────
 function addCard(token, i) {
   const grid = document.getElementById("gallery");
@@ -153,16 +150,22 @@ function addPin(token) {
   pinsByTokenId[token.tokenId] = marker;
 }
 
+function fitMapToPins() {
+  if (!mapInstance || !markersLayer || markersLayer.getLayers().length === 0) return;
+  const bounds = L.latLngBounds(markersLayer.getLayers().map(marker => marker.getLatLng()));
+  mapInstance.fitBounds(bounds.pad(0.2), { maxZoom: 5 });
+}
+
 // ── Carousel ──────────────────────────────────────────────────────────────────
 let carouselTimers = {};
 
 function carouselHTML(key, tokens, idx) {
   const t    = tokens[idx];
   const dots = tokens.map((_, j) => `<span class="c-dot${j === idx ? " c-dot--on" : ""}"></span>`).join("");
-  const avail = t.listed > 0
-    ? `<a class="c-collect" href="${t.objktUrl}" target="_blank" rel="noopener">Collect · ${t.price?.toFixed(2)} ꜩ</a>`
+  const avail = (t.availabilityKind === "open" || t.availabilityKind === "auction")
+    ? `<a class="c-collect" href="${t.objktUrl}" target="_blank" rel="noopener">${t.availabilityKind === "auction" ? "View auction" : "View on objkt"}</a>`
     : t.soldOut
-    ? `<span class="c-sold">Sold out</span>`
+    ? `<span class="c-sold">${t.availabilityText || "Sold out"}</span>`
     : `<a class="c-collect c-collect--ghost" href="${t.objktUrl}" target="_blank" rel="noopener">View on objkt</a>`;
   const tokenIdx = TOKENS.indexOf(t);
   return `<div class="carousel-popup" data-key="${key}">
@@ -251,7 +254,9 @@ function setupLightbox() {
     lbSubtitle.textContent = t.subtitle || "";
     lbDate.textContent     = [t.date, t.loc].filter(Boolean).join(" · ");
 
-    if (t.supply === 1) {
+    if (t.availabilityText) {
+      lbSupply.textContent = t.availabilityText;
+    } else if (t.supply === 1) {
       lbSupply.textContent = t.soldOut ? "1 of 1 · Sold" : t.listed > 0 ? "1 of 1 · Available" : "1 of 1";
     } else if (t.supply > 1) {
       lbSupply.textContent = `${t.listed ?? "?"} of ${t.supply} editions left`;
@@ -260,11 +265,11 @@ function setupLightbox() {
     }
 
     if (lbCollect) {
-      if (t.listed > 0) {
-        lbCollect.textContent = `Collect · ${t.price?.toFixed(2)} ꜩ`;
+      if (t.availabilityKind === "open" || t.availabilityKind === "auction") {
+        lbCollect.textContent = t.availabilityKind === "auction" ? "View auction" : "View on objkt";
         lbCollect.classList.remove("lb-btn--ghost");
       } else {
-        lbCollect.textContent = t.soldOut ? "Sold out · objkt" : "View on objkt";
+        lbCollect.textContent = t.soldOut ? "Collected · objkt" : "View on objkt";
         lbCollect.classList.add("lb-btn--ghost");
       }
       lbCollect.href = t.objktUrl;

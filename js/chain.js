@@ -26,6 +26,17 @@ function localImageFor(name) {
   return key ? LOCAL_IMAGES[key] : null;
 }
 
+function knownDetailsFor(name, description = "") {
+  const haystack = `${name || ""} ${description || ""}`.toLowerCase();
+  return KNOWN_TOKEN_DETAILS.find(item => haystack.includes(item.match)) || null;
+}
+
+function dateFromDescription(description = "") {
+  return description.match(/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},\s+\d{4}\b/i)?.[0]
+    || description.match(/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/)?.[0]
+    || "";
+}
+
 // ── GEOCODING — place name → lat/lng via Nominatim (free, no key) ─────────────
 const geocodeCache = {};
 
@@ -160,6 +171,7 @@ async function loadAllTokens() {
     const name   = meta.name || `Token #${t.tokenId}`;
     const imgUri = ipfsToHttp(meta.displayUri || meta.artifactUri);
     const local  = localImageFor(name);
+    const known  = knownDetailsFor(name, meta.description);
 
     // Check if on-chain attributes already have coords (future-proof)
     const latAttr = parseFloat(attr(meta, "lat"));
@@ -177,17 +189,20 @@ async function loadAllTokens() {
       supply:   parseInt(t.totalSupply) || 0,
       holders:  t.holdersCount || 0,
       objktUrl: OBJKT_BASE + t.tokenId,
+      creator:  meta.creators?.[0] || CREATOR_ADDRESS,
       listed:   null,
       soldOut:  false,
       price:    null,
+      availabilityText: "",
+      availabilityKind: "",
       // From chain attributes (if Tucker adds them later)
-      lat:      isNaN(latAttr) ? null : latAttr,
-      lng:      isNaN(lngAttr) ? null : lngAttr,
+      lat:      isNaN(latAttr) ? known?.lat ?? null : latAttr,
+      lng:      isNaN(lngAttr) ? known?.lng ?? null : lngAttr,
       // From cache (previously extracted by vision)
-      loc:      cached?.loc  || attr(meta, "location") || "",
-      date:     cached?.date || attr(meta, "date") || "",
+      loc:      cached?.loc  || attr(meta, "location") || known?.loc || "",
+      date:     cached?.date || attr(meta, "date") || known?.date || dateFromDescription(meta.description),
       // Will be filled by vision + geocoding
-      _needsExtraction: !cached && isNaN(latAttr),
+      _needsExtraction: !cached && isNaN(latAttr) && !known,
     };
   });
 
@@ -253,12 +268,63 @@ async function enrichTokensWithVision(onTokenUpdated) {
 }
 
 async function fetchAvailability() {
-  // Availability is optional; keep the gallery usable even when objkt/TzKT data
-  // is unavailable or the local fallback dataset is being shown.
+  const byTokenId = {};
+
+  try {
+    let offset = 0;
+    while (true) {
+      const url = `${TZKT}/tokens/balances?token.contract=${CONTRACT}&balance.gt=0&limit=500&offset=${offset}&select=account,balance,token`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("TzKT balances " + res.status);
+      const batch = await res.json();
+      for (const b of batch) {
+        const tid = String(b.token.tokenId);
+        if (!byTokenId[tid]) byTokenId[tid] = [];
+        byTokenId[tid].push(b);
+      }
+      if (batch.length < 500) break;
+      offset += 500;
+    }
+  } catch (err) {
+    console.warn("Availability lookup failed:", err);
+  }
+
   TOKENS.forEach(t => {
-    if (typeof t.listed === "undefined") t.listed = null;
-    if (typeof t.soldOut === "undefined") t.soldOut = false;
-    if (typeof t.price === "undefined") t.price = null;
+    const balances = byTokenId[String(t.tokenId)] || [];
+    const creatorBalance = balances
+      .filter(b => b.account.address === (t.creator || CREATOR_ADDRESS))
+      .reduce((sum, b) => sum + Number(b.balance || 0), 0);
+    const marketBalance = balances
+      .filter(b => MARKET_CONTRACTS.has(b.account.address))
+      .reduce((sum, b) => sum + Number(b.balance || 0), 0);
+    const burnBalance = balances
+      .filter(b => b.account.address === BURN_ADDRESS)
+      .reduce((sum, b) => sum + Number(b.balance || 0), 0);
+
+    t.price = null;
+    if (t.supply > 1) {
+      t.listed = creatorBalance;
+      t.soldOut = creatorBalance === 0;
+      t.availabilityKind = creatorBalance > 0 ? "open" : "sold";
+      t.availabilityText = creatorBalance > 0
+        ? `${creatorBalance} of ${t.supply} editions left`
+        : "Sold out";
+    } else if (marketBalance > 0) {
+      t.listed = marketBalance;
+      t.soldOut = false;
+      t.availabilityKind = "auction";
+      t.availabilityText = "At auction";
+    } else if (creatorBalance > 0) {
+      t.listed = 0;
+      t.soldOut = false;
+      t.availabilityKind = "artist";
+      t.availabilityText = "Held by artist";
+    } else {
+      t.listed = 0;
+      t.soldOut = true;
+      t.availabilityKind = burnBalance > 0 ? "burned" : "sold";
+      t.availabilityText = burnBalance > 0 ? "Burned" : "Collected";
+    }
   });
 }
 
@@ -267,14 +333,14 @@ async function applyCoords(onTokenReady) {
 
   if (TOKENS.some(t => t._isFallback)) return;
 
-  enrichTokensWithVision(token => {
-    const card = document.querySelector(`.sketch-card[data-token-id="${token.tokenId}"]`);
-    if (card) {
-      card.querySelector(".card-loc").textContent = token.loc || "—";
-      card.querySelector(".card-date").textContent = token.date || "";
-    }
-    if (token.lat && token.lng) onTokenReady?.(token);
-  });
+  const needsCoords = TOKENS.filter(t => !t.lat && !t.lng && (t.loc || t.name));
+  for (const token of needsCoords) {
+    const coords = await geocode(token.loc || token.name);
+    if (!coords) continue;
+    token.lat = coords.lat;
+    token.lng = coords.lng;
+    onTokenReady?.(token);
+  }
 }
 
 function startLiveUpdates() {
@@ -310,13 +376,13 @@ async function renderCollectors() {
   wrap.innerHTML = `<p class="loading-msg">Reading the Tezos blockchain…</p>`;
   try {
     const balances = await loadAllHolders();
-    const BURN     = "tz1burnburnburnburnburnburnburjAYjjX";
     const byAddr   = {};
 
     for (const b of balances) {
       const addr = b.account.address;
-      if (addr === BURN) continue;
-      if (!byAddr[addr]) byAddr[addr] = { total: 0, tokenIds: [] };
+      if (addr === BURN_ADDRESS || MARKET_CONTRACTS.has(addr)) continue;
+      if (!byAddr[addr]) byAddr[addr] = { total: 0, tokenIds: [], name: ACCOUNT_NAMES[addr] || b.account.alias || "" };
+      if (b.account.alias && !byAddr[addr].name) byAddr[addr].name = b.account.alias;
       byAddr[addr].total += Number(b.balance);
       byAddr[addr].tokenIds.push(b.token.tokenId);
     }
@@ -332,13 +398,18 @@ async function renderCollectors() {
 
     const rows = entries.map(([addr, info], i) => {
       const short = addr.slice(0, 7) + "…" + addr.slice(-5);
+      const displayName = info.name || short;
+      const addrLine = info.name ? short : "";
       const works = info.tokenIds
         .map(tid => TOKENS.find(t => t.tokenId == tid)?.name || `#${tid}`)
         .filter((v, j, a) => a.indexOf(v) === j).slice(0, 3).join(", ");
       return `<tr class="collector-row" data-addr="${addr}">
         <td class="col-rank">${i + 1}</td>
         <td class="col-addr">
-          <span class="collector-addr" title="${addr}">${short}</span>
+          <span class="collector-identity">
+            <span class="collector-name" title="${addr}">${displayName}</span>
+            ${addrLine ? `<span class="collector-addr-short">${addrLine}</span>` : ""}
+          </span>
           <span class="collector-links">
             <a href="https://tzkt.io/${addr}" target="_blank" rel="noopener">tzkt ↗</a>
             <a href="https://objkt.com/profile/${addr}/collected" target="_blank" rel="noopener">objkt ↗</a>
