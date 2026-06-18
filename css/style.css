@@ -84,6 +84,11 @@ body {
 }
 #wallet-btn:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 #wallet-btn.connected { border-color: var(--sage); color: var(--sage); }
+#wallet-btn.loading,
+#wallet-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
 
 /* ─── HERO ────────────────────────────────────────────────────────────────── */
 .hero {
@@ -628,6 +633,70 @@ footer {
   max-width: 90vw; text-align: center;
 }
 .toast-show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ─── COLLECTOR THANK YOU ─────────────────────────────────────────────────── */
+.collector-thanks {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 700;
+  background: rgba(22,18,12,0.58);
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.collector-thanks.open { display: flex; }
+.collector-thanks-card {
+  position: relative;
+  width: min(92vw, 440px);
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 24px 70px rgba(22,18,12,0.28);
+  padding: 30px;
+}
+.collector-thanks-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sage);
+  margin-bottom: 12px;
+}
+.collector-thanks-card h2 {
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 5vw, 2.2rem);
+  font-weight: 400;
+  line-height: 1.08;
+  margin-bottom: 12px;
+}
+.collector-thanks-card p:not(.collector-thanks-eyebrow) {
+  color: var(--ink-2);
+  line-height: 1.65;
+  margin-bottom: 20px;
+}
+.collector-thanks-action {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--ink);
+  color: var(--paper);
+  border: 1px solid var(--ink);
+  padding: 10px 16px;
+  cursor: pointer;
+}
+.collector-thanks-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  background: none;
+  border: none;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  cursor: pointer;
+}
 
 /* ─── COLLECTOR identity extras ───────────────────────────────────────────── */
 .col-rank { width: 32px; color: var(--ink-3); font-family: var(--font-mono); font-size: 0.7rem; }
