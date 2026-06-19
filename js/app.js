@@ -49,6 +49,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Availability: re-sort and update badges when done.
   fetchAvailability().then(() => {
     DISPLAY_TOKENS = sortTokensForDisplay(uniqueArtworkTokens(TOKENS));
+    if (counter) counter.textContent = DISPLAY_TOKENS.length;
     grid.innerHTML = "";
     DISPLAY_TOKENS.forEach((t, i) => addCard(t, i));
   });
@@ -84,14 +85,14 @@ function uniqueArtworkTokens(tokens) {
   // and zero-supply tokens (detectable immediately from TzKT data).
   return tokens.filter(t =>
     t.availabilityKind !== "burned" &&
-    t.supply !== 0
+    (t.editionSupply ?? t.supply) !== 0
   );
 }
 
 function artworkRank(token) {
   let score = 0;
   if (token.availabilityKind !== "burned") score += 100;
-  if (token.supply > 1) score += 40;
+  if ((token.editionSupply ?? token.supply) > 1) score += 40;
   if (token.availabilityKind === "open" || token.availabilityKind === "auction") score += 20;
   if ((token.collectors || []).length) score += 10;
   return score;
@@ -460,10 +461,10 @@ function setupLightbox() {
 
     if (t.availabilityText) {
       lbSupply.textContent = t.availabilityText;
-    } else if (t.supply === 1) {
+    } else if ((t.editionSupply ?? t.supply) === 1) {
       lbSupply.textContent = t.soldOut ? "1 of 1 · Sold" : t.listed > 0 ? "1 of 1 · Available" : "1 of 1";
-    } else if (t.supply > 1) {
-      lbSupply.textContent = `${t.listed ?? "?"} of ${t.supply} editions left`;
+    } else if ((t.editionSupply ?? t.supply) > 1) {
+      lbSupply.textContent = `${t.listed ?? "?"} of ${t.editionSupply ?? t.supply} editions left`;
     } else {
       lbSupply.textContent = "";
     }
