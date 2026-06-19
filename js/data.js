@@ -55,12 +55,7 @@ const KNOWN_TOKEN_DETAILS = [
   { match: "wind-blown tree", loc: "Kealia Beach, Kauai, HI", lat: 22.0979, lng: -159.3073, streetView: true, placePhotos: true },
   { match: "taos pueblo", loc: "Taos Pueblo, New Mexico", lat: 36.4386, lng: -105.5444, placePhotos: true },
   { match: "quiet creek", loc: "Taos Pueblo, New Mexico", lat: 36.4386, lng: -105.5444, placePhotos: true },
-  { match: "cozumel",              loc: "Cozumel, Mexico",                    lat: 20.4229,  lng: -86.9223,  streetView: true, placePhotos: true },
-  { match: "sandusky campground",  loc: "S. Sandusky Campground, Benton, IL",  lat: 37.9656,  lng: -88.8914,  placePhotos: true },
-  { match: "sandusky campsite",    loc: "S. Sandusky Campground, Benton, IL",  lat: 37.9656,  lng: -88.8914,  placePhotos: true },
-  { match: "marcum campground",    loc: "S. Marcum Campground, Benton, IL",    lat: 37.9589,  lng: -88.9012,  placePhotos: true },
-  { match: "marcum campgrounds",   loc: "S. Marcum Campground, Benton, IL",    lat: 37.9589,  lng: -88.9012,  placePhotos: true },
-  { match: "rend lake",            loc: "Rend Lake, Southern Illinois",         lat: 37.9970,  lng: -88.8770,  placePhotos: true },
+  { match: "cozumel", loc: "Cozumel, Mexico", lat: 20.4229, lng: -86.9223, streetView: true, placePhotos: true },
 ];
 
 // Runtime — populated by chain.js on every page load
