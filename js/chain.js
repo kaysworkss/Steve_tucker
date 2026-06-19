@@ -49,6 +49,10 @@ function shortAddress(address) {
   return address ? address.slice(0, 7) + "…" + address.slice(-5) : "";
 }
 
+function editionLabel(count) {
+  return `${count} edition${count === 1 ? "" : "s"}`;
+}
+
 function accountDisplayName(accountOrAddress) {
   const address = typeof accountOrAddress === "string" ? accountOrAddress : accountOrAddress?.address;
   if (!address) return "";
@@ -96,40 +100,10 @@ async function hydrateAccountNames(addresses) {
 // ── GEOCODING — place name → lat/lng via Nominatim (free, no key) ─────────────
 const geocodeCache = {};
 
-// Strip narrative prefixes and build a list of geocode candidates,
-// from most-specific to least-specific, so Nominatim has the best chance.
-function geocodeCandidates(loc) {
-  if (!loc) return [];
-  // Strip leading narrative phrases
-  let cleaned = loc
-    .replace(/^(a\s+)?(baby|little|young|old)\s+\S+\s+(playing|sitting|standing|fishing|reading)\s+\S+\s+(the|a)\s+/i, "")
-    .replace(/^(view\s+from\s+(my\s+)?|camping\s+in\s+|camped\s+at\s+|sketch\s+(from|at)\s+|drawn\s+at\s+|quiet\s+morning\s+in\s+|early\s+morning\s+(at\s+)?|sitting\s+at\s+)/i, "")
-    .replace(/\bcampsite\s+\d+\b/i, "")  // "Campsite 189" → remove number
-    .trim().replace(/^[,\s]+/, "").trim();
-
-  const parts = loc.split(",").map(s => s.trim()).filter(Boolean);
-  const cleanParts = cleaned.split(",").map(s => s.trim()).filter(Boolean);
-
-  const candidates = new Set();
-  // Full cleaned string
-  if (cleaned && cleaned !== loc) candidates.add(cleaned);
-  // Full original
-  candidates.add(loc);
-  // Drop first part if it's long and narrative (no digits)
-  if (parts.length >= 2 && parts[0].length > 20 && !/\d/.test(parts[0])) {
-    candidates.add(parts.slice(1).join(", "));
-  }
-  // Last two parts (usually "Place, State")
-  if (parts.length >= 2) candidates.add(parts.slice(-2).join(", "));
-  // Last part only
-  if (parts.length >= 1) candidates.add(parts[parts.length - 1]);
-
-  return [...candidates].filter(Boolean);
-}
-
-async function geocodeOne(placeName) {
+async function geocode(placeName) {
   if (!placeName) return null;
   if (geocodeCache[placeName]) return geocodeCache[placeName];
+
   try {
     const q = encodeURIComponent(placeName);
     const res = await fetch(
@@ -144,20 +118,6 @@ async function geocodeOne(placeName) {
     }
   } catch (e) {
     console.warn("Geocode failed for", placeName, e);
-  }
-  return null;
-}
-
-async function geocode(loc) {
-  if (!loc) return null;
-  for (const candidate of geocodeCandidates(loc)) {
-    const result = await geocodeOne(candidate);
-    if (result) {
-      // Cache under the original loc too so we don't re-try
-      geocodeCache[loc] = result;
-      return result;
-    }
-    await new Promise(r => setTimeout(r, 150)); // small gap between Nominatim calls
   }
   return null;
 }
@@ -426,12 +386,18 @@ async function fetchAvailability() {
 
     t.price = null;
     t.collectors = collectorEntries;
-    if (t.supply > 1) {
+    t.burned = burnBalance;
+    t.liveSupply = Math.max(0, Number(t.supply || 0) - burnBalance);
+    t.displaySupply = t.liveSupply || Number(t.supply || 0);
+
+    if (t.displaySupply > 1) {
       t.listed = creatorBalance;
       t.soldOut = creatorBalance === 0;
       t.availabilityKind = creatorBalance > 0 ? "open" : "sold";
       t.availabilityText = creatorBalance > 0
-        ? `${creatorBalance} of ${t.supply} editions left`
+        ? `${creatorBalance} of ${editionLabel(t.displaySupply)} left`
+        : burnBalance > 0
+        ? `Sold out · ${editionLabel(t.displaySupply)} live`
         : "Sold out";
     } else if (marketBalance > 0) {
       t.listed = marketBalance;
