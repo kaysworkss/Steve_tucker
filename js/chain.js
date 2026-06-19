@@ -307,6 +307,8 @@ async function loadAllTokens() {
       img:      imgUri || "",
       ipfsImg:  imgUri,
       supply:   parseInt(t.totalSupply) || 0,
+      editionSupply: parseInt(t.totalSupply) || 0,
+      burned:   0,
       holders:  t.holdersCount || 0,
       objktUrl: OBJKT_BASE + t.tokenId,
       creator:  meta.creators?.[0] || CREATOR_ADDRESS,
@@ -447,12 +449,15 @@ async function fetchAvailability() {
 
     t.price = null;
     t.collectors = collectorEntries;
-    if (t.supply > 1) {
+    t.burned = burnBalance;
+    t.editionSupply = Math.max(0, t.supply - burnBalance);
+
+    if (t.editionSupply > 1) {
       t.listed = creatorBalance;
       t.soldOut = creatorBalance === 0;
       t.availabilityKind = creatorBalance > 0 ? "open" : "sold";
       t.availabilityText = creatorBalance > 0
-        ? `${creatorBalance} of ${t.supply} editions left`
+        ? `${creatorBalance} of ${t.editionSupply} editions left`
         : "Sold out";
     } else if (marketBalance > 0) {
       t.listed = marketBalance;
@@ -467,8 +472,8 @@ async function fetchAvailability() {
     } else {
       t.listed = 0;
       t.soldOut = true;
-      t.availabilityKind = burnBalance > 0 ? "burned" : "sold";
-      t.availabilityText = burnBalance > 0 ? "Burned" : "Collected";
+      t.availabilityKind = t.editionSupply === 0 && burnBalance > 0 ? "burned" : "sold";
+      t.availabilityText = t.availabilityKind === "burned" ? "Burned" : "Collected";
     }
   });
 }
