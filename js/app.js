@@ -30,32 +30,56 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("map").innerHTML = `<p class="loading-msg">Map unavailable. The sketches still load below.</p>`;
   }
 
+  // Step 1 — fetch tokens. This is the only blocking call.
   try { await loadAllTokens(); }
   catch {
     grid.innerHTML = `<p class="loading-msg" style="grid-column:1/-1">Could not reach the blockchain. Reload to try again.</p>`;
     return;
   }
 
-  await fetchAvailability();
-  DISPLAY_TOKENS = sortTokensForDisplay(uniqueArtworkTokens(TOKENS));
-
+  // Step 2 — render gallery immediately with what we have.
+  // Availability badges will fill in once fetchAvailability() resolves.
+  DISPLAY_TOKENS = uniqueArtworkTokens(TOKENS); // unsorted until availability loads
   if (counter) counter.textContent = DISPLAY_TOKENS.length;
   grid.innerHTML = "";
   DISPLAY_TOKENS.forEach((t, i) => addCard(t, i));
-
-  // setupLightbox BEFORE applyCoords so openLightbox is defined when pins are clicked
   setupLightbox();
-  await applyCoords(token => {
+
+  // Step 3 — everything else runs in parallel, non-blocking.
+  // Availability: re-sort and update badges when done.
+  fetchAvailability().then(() => {
+    DISPLAY_TOKENS = sortTokensForDisplay(uniqueArtworkTokens(TOKENS));
+    // Re-order gallery cards to match new sort
+    const frag = document.createDocumentFragment();
+    DISPLAY_TOKENS.forEach((t, i) => {
+      const existing = [...grid.querySelectorAll(".sketch-card")]
+        .find(c => c.dataset.tokenId == t.tokenId);
+      if (existing) {
+        // Update availability badge in place
+        updateCardAvailability(existing, t);
+        frag.appendChild(existing);
+      } else {
+        addCard(t, i);
+        frag.appendChild(grid.lastElementChild);
+      }
+    });
+    grid.appendChild(frag);
+  });
+
+  // Coords: add pins as they resolve, no waiting.
+  applyCoords(token => {
     if (DISPLAY_TOKENS.some(t => String(t.tokenId) === String(token.tokenId))) {
       addPin(token);
       const card = [...document.querySelectorAll(".sketch-card")]
         .find(c => c.dataset.tokenId == token.tokenId);
       if (card) card.querySelector("[data-map-action]")?.classList.remove("card-action--hidden");
     }
-  });
-  fitMapToPins();
+  }).then(() => fitMapToPins());
+
+  // Collectors: load independently, doesn't block anything.
   renderCollectors();
 
+  // Live updates
   startLiveUpdates(newToken => {
     DISPLAY_TOKENS = sortTokensForDisplay(uniqueArtworkTokens(TOKENS));
     const i = DISPLAY_TOKENS.findIndex(t => String(t.tokenId) === String(newToken.tokenId));
@@ -81,25 +105,6 @@ function uniqueArtworkTokens(tokens) {
     const sorted = [...group].sort((a, b) => artworkRank(b) - artworkRank(a));
     const chosen = { ...sorted[0] };
     const seen = new Set();
-    const totalSupply = group.reduce((sum, t) => sum + Number(t.supply || 0), 0);
-    const burned = group.reduce((sum, t) => sum + Number(t.burned || 0), 0);
-    const liveSupply = Math.max(0, totalSupply - burned);
-    const listed = group.reduce((sum, t) => sum + Number(t.listed || 0), 0);
-
-    chosen.supply = totalSupply;
-    chosen.burned = burned;
-    chosen.liveSupply = liveSupply;
-    chosen.displaySupply = liveSupply || totalSupply;
-    chosen.listed = listed;
-    chosen.soldOut = listed === 0 && group.every(t => t.soldOut);
-    if (chosen.displaySupply > 1 && chosen.availabilityKind !== "auction") {
-      chosen.availabilityKind = listed > 0 ? "open" : "sold";
-      chosen.availabilityText = listed > 0
-        ? `${listed} of ${editionLabel(chosen.displaySupply)} left`
-        : burned > 0
-        ? `Sold out · ${editionLabel(chosen.displaySupply)} live`
-        : "Sold out";
-    }
     chosen.collectors = group
       .flatMap(t => t.collectors || [])
       .filter(c => {
@@ -107,9 +112,7 @@ function uniqueArtworkTokens(tokens) {
         seen.add(c.address);
         return true;
       });
-    chosen.relatedTokens = group
-      .map(t => t.tokenId)
-      .filter(tokenId => String(tokenId) !== String(chosen.tokenId));
+    chosen.relatedTokens = group.map(t => t.tokenId);
     return chosen;
   });
 }
@@ -293,7 +296,6 @@ function addPin(token) {
     t.lat.toFixed(4) === token.lat.toFixed(4) &&
     t.lng.toFixed(4) === token.lng.toFixed(4)
   );
-  const popupTokens = grouped.length ? grouped : [token];
 
   // Reuse existing pin at same location
   const existingTid = Object.keys(pinsByTokenId).find(tid => {
@@ -303,11 +305,11 @@ function addPin(token) {
   if (existingTid) { pinsByTokenId[token.tokenId] = pinsByTokenId[existingTid]; return; }
 
   const marker = L.marker([token.lat, token.lng], {
-    icon: markerIconForGroup(popupTokens)
+    icon: markerIconForGroup(grouped)
   });
 
-  marker.on("mouseover", () => showCarousel(marker, popupTokens));
-  marker.on("click", () => showCarousel(marker, popupTokens));
+  marker.on("mouseover", () => showCarousel(marker, grouped));
+  marker.on("click", () => showCarousel(marker, grouped));
   marker.on("mouseout",  () => {
     if (isCoarsePointer()) return;
     scheduleCarouselClose(`${token.lat.toFixed(4)},${token.lng.toFixed(4)}`);
@@ -393,7 +395,6 @@ function carouselHTML(key, tokens, idx) {
 }
 
 function showCarousel(marker, tokens) {
-  if (!tokens?.length) return;
   const key = `${tokens[0].lat.toFixed(4)},${tokens[0].lng.toFixed(4)}`;
   clearTimeout(carouselTimers[key + "_close"]);
 
@@ -488,10 +489,10 @@ function setupLightbox() {
 
     if (t.availabilityText) {
       lbSupply.textContent = t.availabilityText;
-    } else if ((t.displaySupply || t.supply) === 1) {
+    } else if (t.supply === 1) {
       lbSupply.textContent = t.soldOut ? "1 of 1 · Sold" : t.listed > 0 ? "1 of 1 · Available" : "1 of 1";
-    } else if ((t.displaySupply || t.supply) > 1) {
-      lbSupply.textContent = `${t.listed ?? "?"} of ${editionLabel(t.displaySupply || t.supply)} left`;
+    } else if (t.supply > 1) {
+      lbSupply.textContent = `${t.listed ?? "?"} of ${t.supply} editions left`;
     } else {
       lbSupply.textContent = "";
     }
