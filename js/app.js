@@ -49,21 +49,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Availability: re-sort and update badges when done.
   fetchAvailability().then(() => {
     DISPLAY_TOKENS = sortTokensForDisplay(uniqueArtworkTokens(TOKENS));
-    // Re-order gallery cards to match new sort
-    const frag = document.createDocumentFragment();
-    DISPLAY_TOKENS.forEach((t, i) => {
-      const existing = [...grid.querySelectorAll(".sketch-card")]
-        .find(c => c.dataset.tokenId == t.tokenId);
-      if (existing) {
-        // Update availability badge in place
-        updateCardAvailability(existing, t);
-        frag.appendChild(existing);
-      } else {
-        addCard(t, i);
-        frag.appendChild(grid.lastElementChild);
-      }
-    });
-    grid.appendChild(frag);
+    grid.innerHTML = "";
+    DISPLAY_TOKENS.forEach((t, i) => addCard(t, i));
   });
 
   // Coords: add pins as they resolve, no waiting.
@@ -92,29 +79,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 function uniqueArtworkTokens(tokens) {
-  const groups = new Map();
-  for (const token of tokens) {
-    const key = token.img || `token-${token.tokenId}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(token);
-  }
-
-  return [...groups.values()].map(group => {
-    if (group.length === 1) return group[0];
-
-    const sorted = [...group].sort((a, b) => artworkRank(b) - artworkRank(a));
-    const chosen = { ...sorted[0] };
-    const seen = new Set();
-    chosen.collectors = group
-      .flatMap(t => t.collectors || [])
-      .filter(c => {
-        if (!c.address || seen.has(c.address)) return false;
-        seen.add(c.address);
-        return true;
-      });
-    chosen.relatedTokens = group.map(t => t.tokenId);
-    return chosen;
-  });
+  // Each token is a distinct artwork on-chain — no deduplication by image.
+  // The blockchain is the source of truth. Two tokens can legitimately share
+  // the same image (e.g. token 10 and 11 for Barking Sands) and should both show.
+  return tokens;
 }
 
 function artworkRank(token) {
@@ -548,6 +516,7 @@ function setupLightbox() {
   const step = d => openLightbox((currentIdx + d + DISPLAY_TOKENS.length) % DISPLAY_TOKENS.length);
 
   document.getElementById("lb-close").addEventListener("click", closeLightbox);
+  document.getElementById("lb-back")?.addEventListener("click", closeLightbox);
   lb.addEventListener("click", e => { if (e.target === lb) closeLightbox(); });
   document.getElementById("lb-prev").addEventListener("click", () => step(-1));
   document.getElementById("lb-next").addEventListener("click", () => step(1));
