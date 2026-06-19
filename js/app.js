@@ -79,10 +79,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 function uniqueArtworkTokens(tokens) {
-  // Each token is a distinct artwork on-chain — no deduplication by image.
-  // The blockchain is the source of truth. Two tokens can legitimately share
-  // the same image (e.g. token 10 and 11 for Barking Sands) and should both show.
-  return tokens;
+  // Each token is a distinct artwork on-chain.
+  // Exclude burned tokens (availabilityKind set after fetchAvailability)
+  // and zero-supply tokens (detectable immediately from TzKT data).
+  return tokens.filter(t =>
+    t.availabilityKind !== "burned" &&
+    t.supply !== 0
+  );
 }
 
 function artworkRank(token) {
