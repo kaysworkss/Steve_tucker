@@ -307,8 +307,6 @@ async function loadAllTokens() {
       img:      imgUri || "",
       ipfsImg:  imgUri,
       supply:   parseInt(t.totalSupply) || 0,
-      editionSupply: parseInt(t.totalSupply) || 0,
-      burned:   0,
       holders:  t.holdersCount || 0,
       objktUrl: OBJKT_BASE + t.tokenId,
       creator:  meta.creators?.[0] || CREATOR_ADDRESS,
@@ -449,15 +447,12 @@ async function fetchAvailability() {
 
     t.price = null;
     t.collectors = collectorEntries;
-    t.burned = burnBalance;
-    t.editionSupply = Math.max(0, t.supply - burnBalance);
-
-    if (t.editionSupply > 1) {
+    if (t.supply > 1) {
       t.listed = creatorBalance;
       t.soldOut = creatorBalance === 0;
       t.availabilityKind = creatorBalance > 0 ? "open" : "sold";
       t.availabilityText = creatorBalance > 0
-        ? `${creatorBalance} of ${t.editionSupply} editions left`
+        ? `${creatorBalance} of ${t.supply} editions left`
         : "Sold out";
     } else if (marketBalance > 0) {
       t.listed = marketBalance;
@@ -472,8 +467,8 @@ async function fetchAvailability() {
     } else {
       t.listed = 0;
       t.soldOut = true;
-      t.availabilityKind = t.editionSupply === 0 && burnBalance > 0 ? "burned" : "sold";
-      t.availabilityText = t.availabilityKind === "burned" ? "Burned" : "Collected";
+      t.availabilityKind = burnBalance > 0 ? "burned" : "sold";
+      t.availabilityText = burnBalance > 0 ? "Burned" : "Collected";
     }
   });
 }
@@ -583,8 +578,7 @@ async function renderCollectors() {
             ${addrLine ? `<span class="collector-addr-short">${addrLine}</span>` : ""}
           </span>
           <span class="collector-links">
-            <a href="https://tzkt.io/${addr}" target="_blank" rel="noopener">tzkt ↗</a>
-            <a href="https://objkt.com/profile/${addr}/collected" target="_blank" rel="noopener">objkt ↗</a>
+            <a href="https://objkt.com/profile/${addr}" target="_blank" rel="noopener">objkt ↗</a>
           </span>
         </td>
         <td class="col-count"><span class="collector-count">${info.tokenIds.size}</span></td>
