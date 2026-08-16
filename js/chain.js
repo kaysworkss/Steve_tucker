@@ -7,10 +7,11 @@ const IPFS_GW2 = "https://cloudflare-ipfs.com/ipfs/"; // fallback gateway
 const OBJKT_GQL = "https://data.objkt.com/v3/graphql";
 
 // ── Short-lived token list cache (5 min) so repeat visits skip the TzKT call ──
-// v2 bumps visitors off any stale pre-August cache that missed newer mints.
-const TOKEN_LIST_CACHE_KEY = "tucker_tokenlist_v2";
+// v4 discovers future Steve Tucker collections by creator address.
+const TOKEN_LIST_CACHE_KEY = "tucker_tokenlist_v4";
 const TOKEN_LIST_TTL_MS    = 5 * 60 * 1000; // 5 minutes
 const TOKEN_PAGE_SIZE      = 500;
+let DISCOVERED_CONTRACTS  = [];
 
 function getCachedTokenList() {
   try {
@@ -27,20 +28,65 @@ function setCachedTokenList(data) {
 }
 
 async function fetchAllTokenPages() {
+  if (typeof AUTO_DISCOVER_COLLECTIONS === "undefined" || AUTO_DISCOVER_COLLECTIONS) {
+    try {
+      const discovered = await fetchTokensByCreator();
+      if (discovered.length) return discovered;
+    } catch (err) {
+      console.warn("Creator discovery failed, using configured contracts:", err);
+    }
+  }
+
+  const all = [];
+
+  for (const contract of configuredContracts()) {
+    let offset = 0;
+    while (true) {
+      const url = `${TZKT}/tokens?contract=${contract}&limit=${TOKEN_PAGE_SIZE}&offset=${offset}&sort.asc=tokenId`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error("TzKT " + res.status);
+      const batch = await res.json();
+      all.push(...batch);
+      if (batch.length < TOKEN_PAGE_SIZE) break;
+      offset += TOKEN_PAGE_SIZE;
+    }
+  }
+
+  return all;
+}
+
+async function fetchTokensByCreator() {
   const all = [];
   let offset = 0;
 
   while (true) {
-    const url = `${TZKT}/tokens?contract=${CONTRACT}&limit=${TOKEN_PAGE_SIZE}&offset=${offset}&sort.asc=tokenId`;
+    const url = `${TZKT}/tokens?metadata.creators.%5B*%5D=${CREATOR_ADDRESS}&limit=${TOKEN_PAGE_SIZE}&offset=${offset}&sort.asc=tokenId`;
     const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error("TzKT " + res.status);
+    if (!res.ok) throw new Error("TzKT creator tokens " + res.status);
     const batch = await res.json();
     all.push(...batch);
     if (batch.length < TOKEN_PAGE_SIZE) break;
     offset += TOKEN_PAGE_SIZE;
   }
 
+  DISCOVERED_CONTRACTS = [...new Set(all.map(t => t.contract?.address).filter(Boolean))];
   return all;
+}
+
+function tokenIdentity(contract, tokenId) {
+  return `${contract || CONTRACT}:${tokenId}`;
+}
+
+function configuredContracts() {
+  const configured = typeof CONTRACTS !== "undefined" && Array.isArray(CONTRACTS) && CONTRACTS.length
+    ? CONTRACTS
+    : [CONTRACT];
+  return [...new Set([...configured, ...DISCOVERED_CONTRACTS])];
+}
+
+function collectionNameFor(contract) {
+  return (typeof COLLECTION_NAMES !== "undefined" && COLLECTION_NAMES[contract])
+    || shortAddress(contract);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -268,7 +314,7 @@ Respond ONLY with valid JSON, no markdown:
 }
 
 // ── CACHE — persist extracted location data in localStorage ───────────────────
-const CACHE_KEY = `tucker_locations_${CONTRACT}`;
+const CACHE_KEY = `tucker_locations_${configuredContracts().join("_")}`;
 
 function loadCache() {
   try {
@@ -300,11 +346,18 @@ async function loadAllTokens() {
     return TOKENS;
   }
 
+  DISCOVERED_CONTRACTS = [...new Set([
+    ...DISCOVERED_CONTRACTS,
+    ...raw.map(t => t.contract?.address).filter(Boolean),
+  ])];
+
   const cache = loadCache();
 
   // 2. Build initial token objects
   TOKENS = raw.map(t => {
     const meta   = t.metadata || {};
+    const contractAddress = t.contract?.address || CONTRACT;
+    const key = tokenIdentity(contractAddress, t.tokenId);
     const name   = meta.name || `Token #${t.tokenId}`;
     const imgUri = ipfsToHttp(meta.displayUri || meta.artifactUri || meta.thumbnailUri || meta.image);
     const known  = knownDetailsFor(name, meta.description);
@@ -314,9 +367,12 @@ async function loadAllTokens() {
     const lngAttr = parseFloat(attr(meta, "lng"));
 
     // Check cache
-    const cached = cache[t.tokenId];
+    const cached = cache[key] || cache[t.tokenId];
 
     return {
+      tokenKey: key,
+      contract: contractAddress,
+      collectionName: collectionNameFor(contractAddress),
       tokenId:  t.tokenId,
       name,
       subtitle: meta.description || "",
@@ -324,7 +380,7 @@ async function loadAllTokens() {
       ipfsImg:  imgUri,
       supply:   parseInt(t.totalSupply) || 0,
       holders:  t.holdersCount || 0,
-      objktUrl: OBJKT_BASE + t.tokenId,
+      objktUrl: `https://objkt.com/tokens/${contractAddress}/${t.tokenId}`,
       creator:  meta.creators?.[0] || CREATOR_ADDRESS,
       listed:   null,
       soldOut:  false,
@@ -349,10 +405,11 @@ async function loadAllTokens() {
   const cacheToSave = { ...cache };
   let cacheModified = false;
   for (const t of TOKENS) {
-    const cached = cache[t.tokenId];
+    const cached = cache[t.tokenKey] || cache[t.tokenId];
     if (cached?.lat) {
       t.lat = cached.lat; t.lng = cached.lng;
     } else if (cached && !cached.lat && (t.loc || cached.loc)) {
+      delete cacheToSave[t.tokenKey];
       delete cacheToSave[t.tokenId];
       cacheModified = true;
     }
@@ -368,7 +425,7 @@ async function loadAllTokens() {
 
 async function enrichTokensWithVision(onTokenUpdated) {
   const cache  = loadCache();
-  const needed = TOKENS.filter(t => t._needsExtraction && !cache[t.tokenId]);
+  const needed = TOKENS.filter(t => t._needsExtraction && !cache[t.tokenKey]);
 
   if (needed.length === 0) return;
 
@@ -393,7 +450,7 @@ async function enrichTokensWithVision(onTokenUpdated) {
       }
 
       // Cache the result
-      cache[token.tokenId] = {
+      cache[token.tokenKey] = {
         loc:  token.loc,
         date: token.date,
         lat:  token.lat,
@@ -418,19 +475,21 @@ async function fetchAvailability() {
   const byTokenId = {};
 
   try {
-    let offset = 0;
-    while (true) {
-      const url = `${TZKT}/tokens/balances?token.contract=${CONTRACT}&balance.gt=0&limit=500&offset=${offset}&select=account,balance,token`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("TzKT balances " + res.status);
-      const batch = await res.json();
-      for (const b of batch) {
-        const tid = String(b.token.tokenId);
-        if (!byTokenId[tid]) byTokenId[tid] = [];
-        byTokenId[tid].push(b);
+    for (const contract of configuredContracts()) {
+      let offset = 0;
+      while (true) {
+        const url = `${TZKT}/tokens/balances?token.contract=${contract}&balance.gt=0&limit=500&offset=${offset}&select=account,balance,token`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("TzKT balances " + res.status);
+        const batch = await res.json();
+        for (const b of batch) {
+          const tid = tokenIdentity(b.token.contract?.address || contract, b.token.tokenId);
+          if (!byTokenId[tid]) byTokenId[tid] = [];
+          byTokenId[tid].push(b);
+        }
+        if (batch.length < 500) break;
+        offset += 500;
       }
-      if (batch.length < 500) break;
-      offset += 500;
     }
   } catch (err) {
     console.warn("Availability lookup failed:", err);
@@ -441,7 +500,7 @@ async function fetchAvailability() {
     .map(b => b.account.address));
 
   TOKENS.forEach(t => {
-    const balances = byTokenId[String(t.tokenId)] || [];
+    const balances = byTokenId[t.tokenKey] || [];
     const creatorBalance = balances
       .filter(b => b.account.address === (t.creator || CREATOR_ADDRESS))
       .reduce((sum, b) => sum + Number(b.balance || 0), 0);
@@ -500,7 +559,7 @@ async function applyCoords(onTokenReady) {
     if (coords) {
       token.lat = coords.lat; token.lng = coords.lng;
       const cache = loadCache();
-      cache[token.tokenId] = { ...cache[token.tokenId], lat: coords.lat, lng: coords.lng };
+      cache[token.tokenKey] = { ...cache[token.tokenKey], lat: coords.lat, lng: coords.lng };
       saveCache(cache);
       onTokenReady?.(token);
     }
@@ -516,7 +575,7 @@ async function applyCoords(onTokenReady) {
       token.lat = coords.lat; token.lng = coords.lng;
       token.loc = token.loc || token.name;
       const cache = loadCache();
-      cache[token.tokenId] = { ...cache[token.tokenId], lat: coords.lat, lng: coords.lng, loc: token.loc };
+      cache[token.tokenKey] = { ...cache[token.tokenKey], lat: coords.lat, lng: coords.lng, loc: token.loc };
       saveCache(cache);
       onTokenReady?.(token);
     }
@@ -536,24 +595,32 @@ function startLiveUpdates() {
 // ── COLLECTORS ────────────────────────────────────────────────────────────────
 
 async function loadAllHolders() {
-  let all = [], offset = 0;
-  while (true) {
-    const url = `${TZKT}/tokens/balances?token.contract=${CONTRACT}&balance.gt=0&limit=500&offset=${offset}&select=account,balance,token`;
-    const res  = await fetch(url);
-    if (!res.ok) break;
-    const batch = await res.json();
-    all = all.concat(batch);
-    if (batch.length < 500) break;
-    offset += 500;
+  let all = [];
+  for (const contract of configuredContracts()) {
+    let offset = 0;
+    while (true) {
+      const url = `${TZKT}/tokens/balances?token.contract=${contract}&balance.gt=0&limit=500&offset=${offset}&select=account,balance,token`;
+      const res  = await fetch(url);
+      if (!res.ok) break;
+      const batch = await res.json();
+      all = all.concat(batch.map(b => ({ ...b, _contract: b.token.contract?.address || contract })));
+      if (batch.length < 500) break;
+      offset += 500;
+    }
   }
   return all;
 }
 
 async function loadWalletHoldings(address) {
-  const url = `${TZKT}/tokens/balances?token.contract=${CONTRACT}&account=${address}&balance.gt=0&select=token,balance`;
-  const res  = await fetch(url);
-  if (!res.ok) throw new Error("TzKT wallet " + res.status);
-  return res.json();
+  const holdings = [];
+  for (const contract of configuredContracts()) {
+    const url = `${TZKT}/tokens/balances?token.contract=${contract}&account=${address}&balance.gt=0&select=token,balance`;
+    const res  = await fetch(url);
+    if (!res.ok) throw new Error("TzKT wallet " + res.status);
+    const batch = await res.json();
+    holdings.push(...batch.map(b => ({ ...b, _contract: b.token.contract?.address || contract })));
+  }
+  return holdings;
 }
 
 async function renderCollectors() {
@@ -567,7 +634,7 @@ async function renderCollectors() {
       if (addr === BURN_ADDRESS || MARKET_CONTRACTS.has(addr)) continue;
       if (!byAddr[addr]) byAddr[addr] = { tokenIds: new Set(), name: ACCOUNT_NAMES[addr] || b.account.alias || "" };
       if (b.account.alias && !byAddr[addr].name) byAddr[addr].name = b.account.alias;
-      byAddr[addr].tokenIds.add(b.token.tokenId);
+      byAddr[addr].tokenIds.add(tokenIdentity(b._contract || b.token.contract?.address, b.token.tokenId));
     }
     await hydrateAccountNames(Object.keys(byAddr));
     for (const [addr, info] of Object.entries(byAddr)) info.name = ACCOUNT_NAMES[addr] || info.name;
@@ -581,7 +648,7 @@ async function renderCollectors() {
       const short = shortAddress(addr);
       const displayName = info.name || short;
       const addrLine = info.name ? short : "";
-      const workNames = [...info.tokenIds].map(tid => TOKENS.find(t => t.tokenId == tid)?.name || `#${tid}`);
+      const workNames = [...info.tokenIds].map(tid => TOKENS.find(t => t.tokenKey == tid)?.name || `#${tid.split(":").pop()}`);
       const rowId = `works-${addr.slice(-8)}`;
       const visible = workNames.slice(0, 2).map(n => `<span class="work-pill">${n}</span>`).join("");
       const hidden  = workNames.slice(2).map(n => `<span class="work-pill">${n}</span>`).join("");
@@ -623,16 +690,16 @@ window.toggleWorks = function(btn, id) {
 async function markWalletOwned(address) {
   try {
     const holdings = await loadWalletHoldings(address);
-    const ownedIds = new Set(holdings.map(h => String(h.token.tokenId)));
+    const ownedIds = new Set(holdings.map(h => tokenIdentity(h._contract || h.token.contract?.address, h.token.tokenId)));
     const count = [...document.querySelectorAll(".sketch-card")].filter(card => {
       const ids = (card.dataset.relatedTokenIds || card.dataset.tokenId || "").split(",").filter(Boolean);
       return ids.some(id => ownedIds.has(String(id)));
     }).length;
     document.getElementById("my-col-count").textContent = count;
     document.getElementById("my-col-sub").textContent = count === 0
-      ? "You don't hold any Tucker sketches yet."
-      : count === 1 ? "You hold 1 Tucker sketch. It has moved to the top of the gallery."
-      : `You hold ${count} Tucker sketches. They have moved to the top of the gallery.`;
+      ? "You don't hold any Tucker works yet."
+      : count === 1 ? "You hold 1 Tucker work. It has moved to the top of the gallery."
+      : `You hold ${count} Tucker works. They have moved to the top of the gallery.`;
     window.applyWalletCollectionState?.(address, holdings);
     return count;
   } catch (err) {
