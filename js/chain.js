@@ -7,8 +7,10 @@ const IPFS_GW2 = "https://cloudflare-ipfs.com/ipfs/"; // fallback gateway
 const OBJKT_GQL = "https://data.objkt.com/v3/graphql";
 
 // ── Short-lived token list cache (5 min) so repeat visits skip the TzKT call ──
-const TOKEN_LIST_CACHE_KEY = "tucker_tokenlist_v1";
+// v2 bumps visitors off any stale pre-August cache that missed newer mints.
+const TOKEN_LIST_CACHE_KEY = "tucker_tokenlist_v2";
 const TOKEN_LIST_TTL_MS    = 5 * 60 * 1000; // 5 minutes
+const TOKEN_PAGE_SIZE      = 500;
 
 function getCachedTokenList() {
   try {
@@ -22,6 +24,23 @@ function getCachedTokenList() {
 
 function setCachedTokenList(data) {
   try { localStorage.setItem(TOKEN_LIST_CACHE_KEY, JSON.stringify({ ts: Date.now(), data })); } catch {}
+}
+
+async function fetchAllTokenPages() {
+  const all = [];
+  let offset = 0;
+
+  while (true) {
+    const url = `${TZKT}/tokens?contract=${CONTRACT}&limit=${TOKEN_PAGE_SIZE}&offset=${offset}&sort.asc=tokenId`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("TzKT " + res.status);
+    const batch = await res.json();
+    all.push(...batch);
+    if (batch.length < TOKEN_PAGE_SIZE) break;
+    offset += TOKEN_PAGE_SIZE;
+  }
+
+  return all;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -267,10 +286,7 @@ async function loadAllTokens() {
   let raw = getCachedTokenList();
   if (!raw) {
     try {
-      const url = `${TZKT}/tokens?contract=${CONTRACT}&limit=200&sort.asc=tokenId`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("TzKT " + res.status);
-      raw = await res.json();
+      raw = await fetchAllTokenPages();
       setCachedTokenList(raw);
     } catch (err) {
       console.warn("Using local Tucker sketch fallback:", err);
