@@ -56,10 +56,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Coords: add pins as they resolve, no waiting.
   applyCoords(token => {
-    if (DISPLAY_TOKENS.some(t => String(t.tokenId) === String(token.tokenId))) {
-      addPin(token);
+    const displayToken = displayTokenFor(token);
+    if (displayToken) {
+      copyTokenPlaceDetails(displayToken, token);
+      addPin(displayToken);
       const card = [...document.querySelectorAll(".sketch-card")]
-        .find(c => c.dataset.tokenId == token.tokenId);
+        .find(c => (c.dataset.relatedTokenIds || "").split(",").includes(String(token.tokenId)));
       if (card) card.querySelector("[data-map-action]")?.classList.remove("card-action--hidden");
     }
   }).then(() => fitMapToPins());
@@ -80,13 +82,19 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 function uniqueArtworkTokens(tokens) {
-  // Each token is a distinct artwork on-chain.
-  // Exclude burned tokens (availabilityKind set after fetchAvailability)
-  // and zero-supply tokens (detectable immediately from TzKT data).
-  return tokens.filter(t =>
-    t.availabilityKind !== "burned" &&
-    (t.editionSupply ?? t.supply) !== 0
-  );
+  const groups = new Map();
+  tokens
+    .filter(t =>
+      t.availabilityKind !== "burned" &&
+      (t.editionSupply ?? t.supply) !== 0
+    )
+    .forEach(token => {
+      const key = artworkKey(token);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(token);
+    });
+
+  return [...groups.values()].map(mergeArtworkGroup);
 }
 
 function artworkRank(token) {
@@ -96,6 +104,69 @@ function artworkRank(token) {
   if (token.availabilityKind === "open" || token.availabilityKind === "auction") score += 20;
   if ((token.collectors || []).length) score += 10;
   return score;
+}
+
+function artworkKey(token) {
+  return token.ipfsImg || token.img || `${(token.name || "").toLowerCase()}::${(token.subtitle || "").toLowerCase()}`;
+}
+
+function mergeArtworkGroup(group) {
+  const ranked = [...group].sort((a, b) => {
+    const rankDiff = artworkRank(b) - artworkRank(a);
+    if (rankDiff) return rankDiff;
+    return Number(b.tokenId) - Number(a.tokenId);
+  });
+  const primary = { ...ranked[0] };
+  const relatedIds = new Set();
+  const collectorsByAddress = new Map();
+
+  for (const token of ranked) {
+    relatedIds.add(String(token.tokenId));
+    for (const id of token.relatedTokens || []) relatedIds.add(String(id));
+    copyTokenPlaceDetails(primary, token);
+    for (const collector of token.collectors || []) {
+      const existing = collectorsByAddress.get(collector.address);
+      collectorsByAddress.set(collector.address, {
+        ...collector,
+        count: (existing?.count || 0) + Number(collector.count || 0),
+      });
+    }
+  }
+
+  relatedIds.delete(String(primary.tokenId));
+  primary.relatedTokens = [...relatedIds];
+  primary.collectors = [...collectorsByAddress.values()];
+  primary.editionSupply = group.reduce((sum, token) => sum + Number(token.editionSupply ?? token.supply ?? 0), 0);
+  primary.listed = group.some(token => token.listed === null)
+    ? primary.listed
+    : group.reduce((sum, token) => sum + Number(token.listed || 0), 0);
+  primary.soldOut = group.every(token => token.soldOut);
+
+  if (primary.availabilityKind === "open" && primary.editionSupply > 1 && primary.listed !== null) {
+    primary.availabilityText = primary.listed > 0
+      ? `${primary.listed} of ${primary.editionSupply} editions left`
+      : "Sold out";
+  }
+
+  return primary;
+}
+
+function copyTokenPlaceDetails(target, source) {
+  if (!target || !source) return target;
+  for (const field of ["lat", "lng", "loc", "date", "streetView", "placePhotos", "photoQuery"]) {
+    if ((target[field] === null || target[field] === undefined || target[field] === "" || target[field] === false) && source[field]) {
+      target[field] = source[field];
+    }
+  }
+  return target;
+}
+
+function displayTokenFor(token) {
+  const id = String(token?.tokenId);
+  return DISPLAY_TOKENS.find(t =>
+    String(t.tokenId) === id ||
+    (t.relatedTokens || []).map(String).includes(id)
+  );
 }
 
 // Sort: live auctions → open editions → artist-held → collected → burned
