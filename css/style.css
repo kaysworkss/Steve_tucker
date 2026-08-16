@@ -432,6 +432,39 @@ body {
 /* ─── GALLERY ─────────────────────────────────────────────────────────────── */
 #gallery-section { padding-bottom: 72px; border-bottom: 1px solid var(--line-strong); }
 
+.collection-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 5vw 22px;
+}
+.collection-filter[hidden] { display: none; }
+.collection-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(124,51,23,0.28);
+  background: transparent;
+  color: var(--rust);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 9px 11px;
+}
+.collection-filter-btn small {
+  min-width: 1.4rem;
+  color: inherit;
+  opacity: 0.68;
+  text-align: right;
+}
+.collection-filter-btn.active,
+.collection-filter-btn:hover {
+  background: var(--rust);
+  color: var(--paper);
+}
+
 #my-collection {
   display: none;
   margin: 0 5vw 28px;
@@ -477,6 +510,43 @@ body {
   background: var(--line-strong);
   border: 1px solid var(--line-strong);
   margin: 0 5vw;
+}
+.collection-header {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 8px 16px;
+  padding: 22px 24px 16px;
+  background: var(--paper-2);
+  border-top: 1px solid var(--line-strong);
+}
+.collection-header:first-child { border-top: 0; }
+.collection-eyebrow {
+  grid-column: 1 / -1;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rust);
+}
+.collection-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.2rem, 2vw, 1.8rem);
+  font-weight: 400;
+  color: var(--ink);
+}
+.collection-count {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+@media (max-width: 560px) {
+  .collection-header {
+    grid-template-columns: 1fr;
+    padding: 18px 14px 14px;
+  }
 }
 .sketch-card {
   background: var(--paper);
@@ -1104,6 +1174,15 @@ footer {
   }
 
   /* Gallery — 2 columns on mobile */
+  .collection-filter {
+    display: grid;
+    grid-template-columns: 1fr;
+    margin: 0 3vw 18px;
+  }
+  .collection-filter-btn {
+    justify-content: space-between;
+    width: 100%;
+  }
   .gallery-grid {
     grid-template-columns: 1fr 1fr;
     margin: 0 3vw;
