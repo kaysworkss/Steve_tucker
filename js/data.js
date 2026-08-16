@@ -3,6 +3,15 @@
 // All tokens, images, locations and collectors are read live from the blockchain.
 
 const CONTRACT        = "KT1V35dHCUUpXT9ZUbCY58KbWJzkgEpeE5E9";
+const CONTRACTS       = [
+  CONTRACT,                                      // Steve Tucker Sketchbook
+  "KT1LAFJW7KqZzey5LoNiXM8JousQmaGVEhr3",       // Steve Tucker's Paintings
+];
+const AUTO_DISCOVER_COLLECTIONS = true;
+const COLLECTION_NAMES = {
+  [CONTRACT]: "Steve Tucker Sketchbook",
+  "KT1LAFJW7KqZzey5LoNiXM8JousQmaGVEhr3": "Steve Tucker's Paintings",
+};
 const CREATOR_ADDRESS = "tz1MNyWtbh2BLJZvRq68o4LCaHdRWjETjjwV";
 const OBJKT_BASE      = "https://objkt.com/tokens/" + CONTRACT + "/";
 const BURN_ADDRESS    = "tz1burnburnburnburnburnburnburjAYjjX";
