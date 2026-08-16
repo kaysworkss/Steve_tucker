@@ -44,10 +44,13 @@ const KNOWN_TOKEN_DETAILS = [
   { match: "taos pueblo",         loc: "Taos Pueblo, New Mexico",                    lat: 36.4386, lng: -105.5444, placePhotos: true },
   { match: "quiet creek",         loc: "Taos Pueblo, New Mexico",                    lat: 36.4386, lng: -105.5444, placePhotos: true },
   { match: "cozumel",             loc: "Cozumel, Mexico",                            lat: 20.4229, lng: -86.9223,  streetView: true, placePhotos: true },
+  { match: "progresso",           loc: "Progreso, Yucatan, Mexico",                  lat: 21.2810, lng: -89.6652,  streetView: true, placePhotos: true },
   { match: "sandusky campground", loc: "S. Sandusky Campground, Benton, IL",         lat: 37.9656, lng: -88.8914,  placePhotos: true },
   { match: "sandusky campsite",   loc: "S. Sandusky Campground, Benton, IL",         lat: 37.9656, lng: -88.8914,  placePhotos: true },
+  { match: "south sandusky beach", loc: "South Sandusky Beach, Rend Lake, Benton, IL", lat: 37.9729, lng: -88.8855, placePhotos: true },
   { match: "marcum campground",   loc: "S. Marcum Campground, Benton, IL",           lat: 37.9589, lng: -88.9012,  placePhotos: true },
   { match: "marcum campgrounds",  loc: "S. Marcum Campground, Benton, IL",           lat: 37.9589, lng: -88.9012,  placePhotos: true },
+  { match: "kat-a-corner guy",    loc: "Kat-A-Corner, Terre Haute, IN",              lat: 39.4667, lng: -87.4139,  streetView: true, placePhotos: true, photoQuery: "Kat-A-Corner Terre Haute Indiana" },
 ];
 
 // Runtime — populated by chain.js on every page load
