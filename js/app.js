@@ -6,6 +6,7 @@ let DISPLAY_TOKENS = [];
 let OWNED_TOKEN_IDS = new Set();
 let ACTIVE_WALLET_ADDRESS = "";
 let collectionMode = "all";
+let activeGalleryCollection = "all";
 const pinsByTokenId  = {};
 const activeCarousel = {};
 
@@ -27,7 +28,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }).addTo(mapInstance);
     markersLayer = L.layerGroup().addTo(mapInstance);
   } else {
-    document.getElementById("map").innerHTML = `<p class="loading-msg">Map unavailable. The sketches still load below.</p>`;
+    document.getElementById("map").innerHTML = `<p class="loading-msg">Map unavailable. The works still load below.</p>`;
   }
 
   // Step 1 — fetch tokens. This is the only blocking call.
@@ -41,8 +42,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Availability badges will fill in once fetchAvailability() resolves.
   DISPLAY_TOKENS = uniqueArtworkTokens(TOKENS); // unsorted until availability loads
   if (counter) counter.textContent = DISPLAY_TOKENS.length;
-  grid.innerHTML = "";
-  DISPLAY_TOKENS.forEach((t, i) => addCard(t, i));
+  setupCollectionFilter();
+  renderGallery();
   setupLightbox();
 
   // Step 3 — everything else runs in parallel, non-blocking.
@@ -50,8 +51,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   fetchAvailability().then(() => {
     DISPLAY_TOKENS = sortTokensForDisplay(uniqueArtworkTokens(TOKENS));
     if (counter) counter.textContent = DISPLAY_TOKENS.length;
-    grid.innerHTML = "";
-    DISPLAY_TOKENS.forEach((t, i) => addCard(t, i));
+    setupCollectionFilter();
+    renderGallery();
   });
 
   // Coords: add pins as they resolve, no waiting.
@@ -61,7 +62,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       copyTokenPlaceDetails(displayToken, token);
       addPin(displayToken);
       const card = [...document.querySelectorAll(".sketch-card")]
-        .find(c => (c.dataset.relatedTokenIds || "").split(",").includes(String(token.tokenId)));
+        .find(c => (c.dataset.relatedTokenIds || "").split(",").includes(tokenKey(token)));
       if (card) card.querySelector("[data-map-action]")?.classList.remove("card-action--hidden");
     }
   }).then(() => fitMapToPins());
@@ -72,8 +73,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Live updates
   startLiveUpdates(newToken => {
     DISPLAY_TOKENS = sortTokensForDisplay(uniqueArtworkTokens(TOKENS));
-    const i = DISPLAY_TOKENS.findIndex(t => String(t.tokenId) === String(newToken.tokenId));
-    if (i >= 0) addCard(DISPLAY_TOKENS[i], i);
+    const i = DISPLAY_TOKENS.findIndex(t => tokenKey(t) === tokenKey(newToken));
+    if (i >= 0) {
+      setupCollectionFilter();
+      renderGallery();
+    }
     if (newToken.lat && newToken.lng) addPin(newToken);
     if (counter) counter.textContent = DISPLAY_TOKENS.length;
     showToast(`New sketch: "${newToken.name}"`);
@@ -97,6 +101,116 @@ function uniqueArtworkTokens(tokens) {
   return [...groups.values()].map(mergeArtworkGroup);
 }
 
+function renderGallery() {
+  const grid = document.getElementById("gallery");
+  if (!grid) return;
+  grid.innerHTML = "";
+
+  const visibleTokens = filteredGalleryTokens();
+  const groups = groupTokensByCollection(visibleTokens);
+  groups.forEach(group => {
+    if (activeGalleryCollection === "all" && groups.length > 1) addCollectionHeader(grid, group);
+    group.tokens.forEach(token => addCard(token, DISPLAY_TOKENS.indexOf(token)));
+  });
+  if (!visibleTokens.length) {
+    grid.innerHTML = `<p class="loading-msg" style="grid-column:1/-1">No works found in this collection.</p>`;
+  }
+  applyCollectionMode();
+}
+
+function filteredGalleryTokens() {
+  if (activeGalleryCollection === "all") return DISPLAY_TOKENS;
+  return DISPLAY_TOKENS.filter(token => token.contract === activeGalleryCollection);
+}
+
+function setupCollectionFilter() {
+  const wrap = document.getElementById("collection-filter");
+  if (!wrap) return;
+  const groups = groupTokensByCollection(DISPLAY_TOKENS);
+  if (groups.length <= 1) {
+    wrap.innerHTML = "";
+    wrap.hidden = true;
+    activeGalleryCollection = "all";
+    return;
+  }
+
+  wrap.hidden = false;
+  const validKeys = new Set(groups.map(group => group.key));
+  if (activeGalleryCollection !== "all" && !validKeys.has(activeGalleryCollection)) {
+    activeGalleryCollection = "all";
+  }
+
+  const buttons = [
+    { key: "all", name: "All collections", count: DISPLAY_TOKENS.length },
+    ...groups.map(group => ({ key: group.key, name: group.name, count: group.tokens.length })),
+  ];
+
+  wrap.innerHTML = buttons.map(button => `
+    <button type="button"
+            class="collection-filter-btn${button.key === activeGalleryCollection ? " active" : ""}"
+            data-collection="${button.key}">
+      <span>${button.name}</span>
+      <small>${button.count}</small>
+    </button>
+  `).join("");
+
+  if (!wrap.dataset.ready) {
+    wrap.dataset.ready = "true";
+    wrap.addEventListener("click", e => {
+      const btn = e.target.closest("button[data-collection]");
+      if (!btn) return;
+      activeGalleryCollection = btn.dataset.collection || "all";
+      setupCollectionFilter();
+      renderGallery();
+      document.getElementById("gallery-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+}
+
+function groupTokensByCollection(tokens) {
+  const byCollection = new Map();
+  tokens.forEach(token => {
+    const key = token.contract || "unknown";
+    if (!byCollection.has(key)) {
+      byCollection.set(key, {
+        key,
+        name: token.collectionName || collectionNameForToken(token),
+        tokens: [],
+      });
+    }
+    byCollection.get(key).tokens.push(token);
+  });
+  return [...byCollection.values()].sort((a, b) => collectionOrder(a.key) - collectionOrder(b.key));
+}
+
+function addCollectionHeader(grid, group) {
+  const header = document.createElement("div");
+  header.className = "collection-header";
+  header.dataset.collection = group.key;
+  header.innerHTML = `
+    <p class="collection-eyebrow">Collection</p>
+    <h3 class="collection-title">${group.name}</h3>
+    <span class="collection-count">${group.tokens.length} work${group.tokens.length === 1 ? "" : "s"}</span>
+  `;
+  grid.appendChild(header);
+}
+
+function collectionOrder(contract) {
+  const configured = typeof CONTRACTS !== "undefined" ? CONTRACTS : [];
+  const idx = configured.indexOf(contract);
+  return idx === -1 ? 999 : idx;
+}
+
+function collectionNameForToken(token) {
+  return (typeof COLLECTION_NAMES !== "undefined" && COLLECTION_NAMES[token.contract])
+    || token.collectionName
+    || shortContract(token.contract);
+}
+
+function shortContract(contract) {
+  return contract ? `${contract.slice(0, 7)}...${contract.slice(-5)}` : "Discovered collection";
+}
+
 function artworkRank(token) {
   let score = 0;
   if (token.availabilityKind !== "burned") score += 100;
@@ -107,7 +221,15 @@ function artworkRank(token) {
 }
 
 function artworkKey(token) {
-  return token.ipfsImg || token.img || `${(token.name || "").toLowerCase()}::${(token.subtitle || "").toLowerCase()}`;
+  return token.ipfsImg || token.img || `${normalizeArtworkTitle(token.name || "")}::${normalizeArtworkTitle(token.subtitle || "")}`;
+}
+
+function normalizeArtworkTitle(value) {
+  return String(value)
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[^\w\s-]/g, "")
+    .trim();
 }
 
 function mergeArtworkGroup(group) {
@@ -121,7 +243,7 @@ function mergeArtworkGroup(group) {
   const collectorsByAddress = new Map();
 
   for (const token of ranked) {
-    relatedIds.add(String(token.tokenId));
+    relatedIds.add(tokenKey(token));
     for (const id of token.relatedTokens || []) relatedIds.add(String(id));
     copyTokenPlaceDetails(primary, token);
     for (const collector of token.collectors || []) {
@@ -133,7 +255,7 @@ function mergeArtworkGroup(group) {
     }
   }
 
-  relatedIds.delete(String(primary.tokenId));
+  relatedIds.delete(tokenKey(primary));
   primary.relatedTokens = [...relatedIds];
   primary.collectors = [...collectorsByAddress.values()];
   primary.editionSupply = group.reduce((sum, token) => sum + Number(token.editionSupply ?? token.supply ?? 0), 0);
@@ -162,11 +284,15 @@ function copyTokenPlaceDetails(target, source) {
 }
 
 function displayTokenFor(token) {
-  const id = String(token?.tokenId);
+  const id = tokenKey(token);
   return DISPLAY_TOKENS.find(t =>
-    String(t.tokenId) === id ||
+    tokenKey(t) === id ||
     (t.relatedTokens || []).map(String).includes(id)
   );
+}
+
+function tokenKey(token) {
+  return String(token?.tokenKey || token?.tokenId || "");
 }
 
 // Sort: live auctions → open editions → artist-held → collected → burned
@@ -270,8 +396,8 @@ function addCard(token, i) {
   const grid = document.getElementById("gallery");
   const card = document.createElement("article");
   card.className = "sketch-card";
-  card.dataset.tokenId = token.tokenId;
-  card.dataset.relatedTokenIds = [token.tokenId, ...(token.relatedTokens || [])].map(String).join(",");
+  card.dataset.tokenId = tokenKey(token);
+  card.dataset.relatedTokenIds = [tokenKey(token), ...(token.relatedTokens || [])].map(String).join(",");
   card.setAttribute("tabindex", "0");
   card.setAttribute("role", "button");
   card.setAttribute("aria-label", `View ${token.name}`);
@@ -303,7 +429,7 @@ function addCard(token, i) {
       document.getElementById("map-section")?.scrollIntoView({ behavior:"smooth", block:"center" });
       setTimeout(() => {
         if (mapInstance) mapInstance.flyTo([token.lat, token.lng], 10, { duration: 1.1 });
-        const pin = pinsByTokenId[token.tokenId];
+        const pin = pinsByTokenId[tokenKey(token)];
         if (pin) showCarousel(pin, DISPLAY_TOKENS.filter(x =>
           x.lat?.toFixed(4) === token.lat.toFixed(4) && x.lng?.toFixed(4) === token.lng.toFixed(4)));
       }, 400);
@@ -327,7 +453,7 @@ function pinSvg(owned = false) {
 }
 
 function tokenIsOwned(token) {
-  const ids = [token?.tokenId, ...(token?.relatedTokens || [])].map(String);
+  const ids = [tokenKey(token), ...(token?.relatedTokens || [])].map(String);
   return ids.some(id => OWNED_TOKEN_IDS.has(id));
 }
 
@@ -342,10 +468,10 @@ function addPin(token) {
 
   // Reuse existing pin at same location
   const existingTid = Object.keys(pinsByTokenId).find(tid => {
-    const t = DISPLAY_TOKENS.find(x => String(x.tokenId) === String(tid));
+    const t = DISPLAY_TOKENS.find(x => tokenKey(x) === String(tid));
     return t?.lat?.toFixed(4) === token.lat.toFixed(4) && t?.lng?.toFixed(4) === token.lng.toFixed(4);
   });
-  if (existingTid) { pinsByTokenId[token.tokenId] = pinsByTokenId[existingTid]; return; }
+  if (existingTid) { pinsByTokenId[tokenKey(token)] = pinsByTokenId[existingTid]; return; }
 
   const marker = L.marker([token.lat, token.lng], {
     icon: markerIconForGroup(grouped)
@@ -359,7 +485,7 @@ function addPin(token) {
   });
 
   markersLayer.addLayer(marker);
-  pinsByTokenId[token.tokenId] = marker;
+  pinsByTokenId[tokenKey(token)] = marker;
 }
 
 function markerIconForGroup(tokens) {
@@ -379,7 +505,7 @@ function refreshOwnedPins() {
   Object.entries(pinsByTokenId).forEach(([tokenId, marker]) => {
     if (!marker || seen.has(marker)) return;
     seen.add(marker);
-    const token = DISPLAY_TOKENS.find(t => String(t.tokenId) === String(tokenId));
+    const token = DISPLAY_TOKENS.find(t => tokenKey(t) === String(tokenId));
     if (!token?.lat || !token?.lng) return;
     const grouped = DISPLAY_TOKENS.filter(t =>
       t.lat && t.lng &&
@@ -417,7 +543,7 @@ function carouselHTML(key, tokens, idx) {
   const photos = placePhotosUrl(t)
     ? `<a class="c-open c-street" href="${placePhotosUrl(t)}" target="_blank" rel="noopener">Place photos</a>`
     : "";
-  const tokenIdx = DISPLAY_TOKENS.findIndex(token => String(token.tokenId) === String(t.tokenId));
+  const tokenIdx = DISPLAY_TOKENS.findIndex(token => tokenKey(token) === tokenKey(t));
   return `<div class="carousel-popup" data-key="${key}">
     <div class="c-img-wrap">
       <img class="c-img" src="${t.img}" alt="${t.name}">
@@ -558,7 +684,7 @@ function setupLightbox() {
           closeLightbox();
           setTimeout(() => {
             mapInstance.flyTo([t.lat, t.lng], 10, { duration: 1.2 });
-            const pin = pinsByTokenId[t.tokenId];
+            const pin = pinsByTokenId[tokenKey(t)];
             if (pin) showCarousel(pin, DISPLAY_TOKENS.filter(x =>
               x.lat?.toFixed(4) === t.lat.toFixed(4) && x.lng?.toFixed(4) === t.lng.toFixed(4)));
             document.getElementById("map-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -609,8 +735,8 @@ function setupCollectionControls() {
   const actions = document.createElement("div");
   actions.className = "my-col-actions";
   actions.innerHTML = `
-    <button type="button" class="my-col-action active" data-mode="all">All sketches</button>
-    <button type="button" class="my-col-action" data-mode="owned">My sketches</button>
+    <button type="button" class="my-col-action active" data-mode="all">All works</button>
+    <button type="button" class="my-col-action" data-mode="owned">My works</button>
     <button type="button" class="my-col-action" data-mode="map">My places on map</button>
   `;
   panel.appendChild(actions);
@@ -649,7 +775,7 @@ function applyCollectionMode() {
   });
 
   const grid = document.getElementById("gallery");
-  if (grid) [...ownedCards, ...otherCards].forEach(card => grid.appendChild(card));
+  if (grid && collectionMode === "owned") [...ownedCards, ...otherCards].forEach(card => grid.appendChild(card));
 
   document.getElementById("gallery-section")?.classList.toggle("show-owned-only", collectionMode === "owned");
   document.getElementById("map-section")?.classList.toggle("show-owned-map", collectionMode === "map");
@@ -675,7 +801,10 @@ function fitMapToOwnedPins() {
 window.applyWalletCollectionState = function(address, holdings = []) {
   ACTIVE_WALLET_ADDRESS = address || "";
   window.ACTIVE_TUCKER_WALLET = ACTIVE_WALLET_ADDRESS;
-  const ownedIds = holdings.map(h => String(h.token?.tokenId ?? h.tokenId)).filter(Boolean);
+  const ownedIds = holdings
+    .map(h => h.tokenKey || (h._contract && h.token?.tokenId ? `${h._contract}:${h.token.tokenId}` : h.token?.tokenId ?? h.tokenId))
+    .map(String)
+    .filter(Boolean);
   OWNED_TOKEN_IDS = new Set(ownedIds);
   setupCollectionControls();
   applyCollectionMode();
